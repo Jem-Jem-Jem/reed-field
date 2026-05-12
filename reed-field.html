@@ -339,7 +339,7 @@
 
   // Boot
   ReedField.init('reed-hero', {
-    reedCount: 2000,
+    reedCount: window.innerWidth < 768 ? 1400 : 2000,
   });
   </script>
 </body>
