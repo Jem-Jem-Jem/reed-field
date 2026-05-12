@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reed Field</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b0f0c;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    #reed-hero {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+    }
+    #reed-hero canvas {
+      display: block;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="reed-hero"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <script>
+  /* Reed Field — Hydrodynamic Passage (touch-enabled build) */
+  const ReedField = (() => {
+
+    // ── seeded RNG (xorshift32) ──────────────────────────────────
+    let _rng = 1;
+    const seedRNG  = s  => { _rng = (s | 0) || 1; };
+    const rnd      = () => {
+      _rng ^= _rng << 13;
+      _rng ^= _rng >> 17;
+      _rng ^= _rng << 5;
+      return (_rng >>> 0) / 4294967295;
+    };
+    const rndRange = (lo, hi) => lo + rnd() * (hi - lo);
+
+    function makeReedClass(p) {
+      return class Reed {
+        constructor(x, y) {
+          this.bx = x;
+          this.by = y;
+          const rA = rnd() * Math.PI * 2;
+          const rM = rndRange(2.5, 9.5);
+          this.restDx = Math.cos(rA) * rM;
+          this.restDy = Math.sin(rA) * rM;
+          this.dx = this.restDx;
+          this.dy = this.restDy;
+          this.vx = 0;
+          this.vy = 0;
+          this.maxLen   = rndRange(18, 42);
+          this.baseW    = rndRange(1.1, 2.6);
+          this.phase    = rnd() * Math.PI * 2;
+          this.phaseY   = rnd() * Math.PI * 2;
+          this.colorVar = rnd();
+          this.alpha    = rndRange(140, 230);
+        }
+        update(mx, my, t, cfg) {
+          const sw    = cfg.swayStrength;
+          const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
+          const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
+          const cx   = this.bx - mx;
+          const cy   = this.by - my;
+          const dist = Math.sqrt(cx * cx + cy * cy);
+          let forceX = 0, forceY = 0;
+          if (dist < cfg.influenceRadius && dist > 0.5) {
+            const t1 = 1.0 - dist / cfg.influenceRadius;
+            const fm = t1 * t1 * cfg.forceStrength;
+            forceX   = (cx / dist) * fm;
+            forceY   = (cy / dist) * fm;
+          }
+          const tDx = this.restDx + swayX;
+          const tDy = this.restDy + swayY;
+          const spX = (tDx - this.dx) * cfg.stiffness;
+          const spY = (tDy - this.dy) * cfg.stiffness;
+          this.vx = (this.vx + forceX + spX) * cfg.damping;
+          this.vy = (this.vy + forceY + spY) * cfg.damping;
+          this.dx += this.vx;
+          this.dy += this.vy;
+        }
+        draw(baseCol, tipCol) {
+          const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+          if (mag < 0.25) return;
+          const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
+          const nx   = this.dx / mag;
+          const ny   = this.dy / mag;
+          const segs = 4;
+          for (let i = 0; i < segs; i++) {
+            const t0   = i / segs;
+            const t1   = (i + 1) / segs;
+            const tMid = (t0 + t1) * 0.5;
+            const x0 = this.bx + nx * t0 * vLen;
+            const y0 = this.by + ny * t0 * vLen;
+            const x1 = this.bx + nx * t1 * vLen;
+            const y1 = this.by + ny * t1 * vLen;
+            const ct  = Math.pow(tMid, 0.65) * (0.45 + this.colorVar * 0.55);
+            const col = p.lerpColor(baseCol, tipCol, ct);
+            const al  = this.alpha * (1.0 - tMid * 0.45);
+            p.stroke(p.red(col), p.green(col), p.blue(col), al);
+            p.strokeWeight(this.baseW * (1.35 - tMid * 1.1));
+            p.line(x0, y0, x1, y1);
+          }
+          const br = p.red(baseCol)   * 0.6;
+          const bg = p.green(baseCol) * 0.6;
+          const bb = p.blue(baseCol)  * 0.6;
+          p.fill(br, bg, bb, this.alpha * 0.55);
+          p.noStroke();
+          p.ellipse(this.bx, this.by, this.baseW * 1.6, this.baseW * 1.6);
+          p.noFill();
+        }
+      };
+    }
+
+    function buildBackground(p, cfg) {
+      const g    = p.createGraphics(p.width, p.height);
+      const bgR  = parseInt(cfg.bgColor.slice(1, 3), 16);
+      const bgG  = parseInt(cfg.bgColor.slice(3, 5), 16);
+      const bgBl = parseInt(cfg.bgColor.slice(5, 7), 16);
+      g.noStroke();
+      g.background(bgR, bgG, bgBl);
+      p.noiseSeed(cfg.seed + 7391);
+      const step = 7;
+      for (let y = 0; y < g.height + step; y += step) {
+        for (let x = 0; x < g.width + step; x += step) {
+          const n  = p.noise(x * 0.010, y * 0.010);
+          const n2 = p.noise(x * 0.022 + 400, y * 0.022 + 400);
+          const v  = (n * 0.68 + n2 * 0.32 - 0.5) * 22;
+          g.fill(
+            p.constrain(bgR + v, 0, 255),
+            p.constrain(bgG + v, 0, 255),
+            p.constrain(bgBl + v, 0, 255),
+            78
+          );
+          g.rect(x, y, step, step);
+        }
+      }
+      const cx = g.width * 0.5, cy = g.height * 0.5;
+      const maxD = Math.sqrt(cx * cx + cy * cy);
+      for (let r = 0; r < 6; r++) {
+        const t   = r / 5;
+        const rad = maxD * (0.55 + t * 0.55);
+        g.fill(0, t * t * 55);
+        g.noStroke();
+        g.ellipse(cx, cy, rad * 2, rad * 2);
+      }
+      return g;
+    }
+
+    function init(containerId, userConfig = {}) {
+      const cfg = Object.assign({
+        seed:            42,
+        reedCount:       1300,
+        swayStrength:    2.5,
+        influenceRadius: 115,
+        forceStrength:   8,
+        stiffness:       0.044,
+        damping:         0.87,
+        bgColor:         '#0b0f0c',
+        baseColor:       '#1e3320',
+        tipColor:        '#c49030',
+        aspectRatio:     null,   // null = fill container height
+        autoMobileScale: true,
+      }, userConfig);
+
+      // Auto-tune for small/touch screens (only if user didn't override)
+      if (cfg.autoMobileScale && userConfig.reedCount === undefined && window.innerWidth < 768) {
+        cfg.reedCount = 600;
+      }
+
+      new p5(p => {
+        let reeds         = [];
+        let bgBuffer      = null;
+        let baseCol, tipCol;
+        let pointerInside = false;
+        let lastMX        = -99999;
+        let lastMY        = -99999;
+        let Reed;
+        let cnv;
+        const container   = document.getElementById(containerId);
+
+        function canvasHeight() {
+          return cfg.aspectRatio
+            ? Math.round(p.width * cfg.aspectRatio)
+            : container.offsetHeight || Math.round(p.width * 0.5625);
+        }
+
+        function parseColors() {
+          baseCol = p.color(
+            parseInt(cfg.baseColor.slice(1,3),16),
+            parseInt(cfg.baseColor.slice(3,5),16),
+            parseInt(cfg.baseColor.slice(5,7),16)
+          );
+          tipCol = p.color(
+            parseInt(cfg.tipColor.slice(1,3),16),
+            parseInt(cfg.tipColor.slice(3,5),16),
+            parseInt(cfg.tipColor.slice(5,7),16)
+          );
+        }
+
+        function initSystem() {
+          seedRNG(cfg.seed);
+          Reed     = makeReedClass(p);
+          bgBuffer = buildBackground(p, cfg);
+          parseColors();
+          reeds = [];
+          const aspect = p.width / p.height;
+          const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
+          const rows   = Math.max(Math.round(cfg.reedCount / cols), 1);
+          const spX    = p.width  / cols;
+          const spY    = p.height / rows;
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const jx = (rnd() - 0.5) * spX * 0.88;
+              const jy = (rnd() - 0.5) * spY * 0.88;
+              const x  = p.constrain((c + 0.5) * spX + jx, 1, p.width  - 1);
+              const y  = p.constrain((r + 0.5) * spY + jy, 1, p.height - 1);
+              reeds.push(new Reed(x, y));
+            }
+          }
+        }
+
+        function updateFromClient(clientX, clientY) {
+          if (clientX == null || clientY == null) return;
+          const rect = cnv.elt.getBoundingClientRect();
+          lastMX = clientX - rect.left;
+          lastMY = clientY - rect.top;
+          pointerInside = true;
+        }
+
+        p.setup = () => {
+          const w = container.offsetWidth || 800;
+          const h = canvasHeight();
+          cnv = p.createCanvas(w, h);
+          cnv.parent(containerId);
+          p.colorMode(p.RGB, 255);
+          p.noFill();
+
+          cnv.elt.style.display    = 'block';
+          cnv.elt.style.cursor     = 'crosshair';
+          cnv.elt.style.touchAction = 'none';
+
+          // Pointer events cover mouse, pen and touch in one place.
+          if (window.PointerEvent) {
+            cnv.elt.addEventListener('pointerenter', e => updateFromClient(e.clientX, e.clientY));
+            cnv.elt.addEventListener('pointermove',  e => updateFromClient(e.clientX, e.clientY));
+            cnv.elt.addEventListener('pointerdown',  e => updateFromClient(e.clientX, e.clientY));
+            cnv.elt.addEventListener('pointerleave', () => {
+              pointerInside = false;
+              lastMX = -99999;
+              lastMY = -99999;
+            });
+            cnv.elt.addEventListener('pointercancel', () => {
+              pointerInside = false;
+              lastMX = -99999;
+              lastMY = -99999;
+            });
+          } else {
+            // Fallback for older browsers.
+            cnv.elt.addEventListener('mouseenter', e => updateFromClient(e.clientX, e.clientY));
+            cnv.elt.addEventListener('mousemove',  e => updateFromClient(e.clientX, e.clientY));
+            cnv.elt.addEventListener('mouseleave', () => {
+              pointerInside = false;
+              lastMX = -99999;
+              lastMY = -99999;
+            });
+            cnv.elt.addEventListener('touchstart', e => {
+              const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
+              e.preventDefault();
+            }, { passive: false });
+            cnv.elt.addEventListener('touchmove', e => {
+              const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
+              e.preventDefault();
+            }, { passive: false });
+            cnv.elt.addEventListener('touchend', () => {
+              pointerInside = false;
+              lastMX = -99999;
+              lastMY = -99999;
+            });
+          }
+
+          initSystem();
+        };
+
+        // Watch the container for size changes (responsive parents, Figma Sites breakpoints, etc.).
+        let resizeTimer;
+        function refreshSize() {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const w = container.offsetWidth  || 800;
+            const h = canvasHeight();
+            if (Math.abs(p.width - w) > 1 || Math.abs(p.height - h) > 1) {
+              p.resizeCanvas(w, h);
+              initSystem();
+            }
+          }, 120);
+        }
+        p.windowResized = refreshSize;
+        if (window.ResizeObserver) {
+          new ResizeObserver(refreshSize).observe(container);
+        }
+
+        p.draw = () => {
+          const t  = p.frameCount * 0.016;
+          const mx = pointerInside ? lastMX : -99999;
+          const my = pointerInside ? lastMY : -99999;
+
+          p.image(bgBuffer, 0, 0);
+
+          for (const reed of reeds) {
+            reed.update(mx, my, t, cfg);
+            reed.draw(baseCol, tipCol);
+          }
+
+          if (pointerInside && mx > 0 && mx < p.width && my > 0 && my < p.height) {
+            p.noFill();
+            p.stroke(255, 255, 255, 7);
+            p.strokeWeight(0.75);
+            p.ellipse(mx, my, cfg.influenceRadius * 2, cfg.influenceRadius * 2);
+            p.stroke(255, 255, 255, 35);
+            p.strokeWeight(1.8);
+            p.point(mx, my);
+          }
+        };
+      });
+    }
+
+    return { init };
+  })();
+
+  // Boot
+  ReedField.init('reed-hero', {
+    // Override defaults here if you want, e.g.:
+    // reedCount: 900,
+    // tipColor: '#e4b85a',
+  });
+  </script>
+</body>
+</html>
