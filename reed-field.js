@@ -44,8 +44,8 @@ const ReedField = (() => {
         //                 tip (larger -> longer straight section near the top)
         //   bendBias    = small lateral offset of the base control point so
         //                 reeds don't all bend in identical symmetric arcs
-        this.bendBaseLen = rndRange(0.10, 0.22);
-        this.bendTipLen  = rndRange(0.40, 0.60);
+        this.bendBaseLen = rndRange(0.25, 0.45);
+        this.bendTipLen  = rndRange(0.55, 0.80);
         this.bendBias    = rndRange(-0.05, 0.05);
         // Tip resists outward bending: tip endpoint and tangent are blended
         // between the displacement direction and straight up, so the tip
@@ -182,8 +182,8 @@ const ReedField = (() => {
       reedCount:       1300,
       swayStrength:    2.5,
       influenceRadius: 115,
-      forceStrength:   8,
-      stiffness:       0.03,
+      forceStrength:   14,
+      stiffness:       0.02,
       damping:         0.88,
       reedLengthMin:   18,
       reedLengthMax:   42,
