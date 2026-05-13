@@ -35,12 +35,17 @@ const ReedField = (() => {
         this.vy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
         this.baseW     = rndRange(1.6, 2.8);
-        // Per-reed bend personality: where the Bezier control point sits.
-        // Higher bendStiff = control point closer to the tip = stiffer-looking
-        // reed that bends near the top. bendBias gives a small lateral offset
-        // so reeds don't all curve in a perfectly symmetric arc.
-        this.bendStiff = rndRange(0.55, 0.85);
-        this.bendBias  = rndRange(-0.1, 0.1);
+        // Cubic Bezier bend personality (curvature near the base, near-straight
+        // mid-to-tip section that points along the displacement direction):
+        //   bendBaseLen = length of the straight-up tangent at the base
+        //                 (smaller -> sharper, lower bend)
+        //   bendTipLen  = length of the displacement-direction tangent at the
+        //                 tip (larger -> longer straight section near the top)
+        //   bendBias    = small lateral offset of the base control point so
+        //                 reeds don't all bend in identical symmetric arcs
+        this.bendBaseLen = rndRange(0.10, 0.22);
+        this.bendTipLen  = rndRange(0.40, 0.60);
+        this.bendBias    = rndRange(-0.05, 0.05);
         this.phase     = rnd() * Math.PI * 2;
         this.phaseY    = rnd() * Math.PI * 2;
         this.colorVar  = rnd();
@@ -97,10 +102,8 @@ const ReedField = (() => {
       }
       draw(baseCol, tipCol) {
         // Base dot is always rendered so every reed is visible at rest.
-        const br = p.red(baseCol)   * 0.6;
-        const bg = p.green(baseCol) * 0.6;
-        const bb = p.blue(baseCol)  * 0.6;
-        p.fill(br, bg, bb, this.alpha * 0.55);
+        // Use baseCol directly (no darkening) so dots match the reed color.
+        p.fill(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha * 0.55);
         p.noStroke();
         p.ellipse(this.bx, this.by, this.baseW * 2.5, this.baseW * 2.5);
         p.noFill();
@@ -110,28 +113,41 @@ const ReedField = (() => {
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
         const nx   = this.dx / mag;
         const ny   = this.dy / mag;
-        // Quadratic Bezier: base tangent points straight up so the reed grows
-        // vertically and bends toward the cursor's displacement direction.
-        // The control point offset is per-reed (bendStiff, bendBias) so the
-        // field doesn't all bend in lockstep.
-        const p1x = this.bx + this.bendBias * vLen;
-        const p1y = this.by - this.bendStiff * vLen;
-        const p2x = this.bx + nx * vLen;
-        const p2y = this.by + ny * vLen;
+        // Cubic Bezier so curvature can be concentrated near the base while
+        // the mid-to-tip section runs nearly straight along the displacement
+        // direction:
+        //   P0 = base (rooted)
+        //   P1 = base + tangent-up * bendBaseLen * vLen  (short -> sharp early bend)
+        //   P2 = tip - displacement-dir * bendTipLen * vLen  (long -> calm tip)
+        //   P3 = tip in displacement direction
+        const bxx = this.bx;
+        const byy = this.by;
+        const p3x = bxx + nx * vLen;
+        const p3y = byy + ny * vLen;
+        const baseLen = vLen * this.bendBaseLen;
+        const tipLen  = vLen * this.bendTipLen;
+        const p1x = bxx + this.bendBias * vLen;
+        const p1y = byy - baseLen;
+        const p2x = p3x - nx * tipLen;
+        const p2y = p3y - ny * tipLen;
         const segs = 5;
-        let px = this.bx, py = this.by;
+        let px = bxx, py = byy;
         for (let i = 1; i <= segs; i++) {
           const t1   = i / segs;
           const u    = 1 - t1;
-          const x1   = u * u * this.bx + 2 * u * t1 * p1x + t1 * t1 * p2x;
-          const y1   = u * u * this.by + 2 * u * t1 * p1y + t1 * t1 * p2y;
+          const u2   = u * u;
+          const u3   = u2 * u;
+          const t2   = t1 * t1;
+          const t3   = t2 * t1;
+          const x1   = u3 * bxx + 3 * u2 * t1 * p1x + 3 * u * t2 * p2x + t3 * p3x;
+          const y1   = u3 * byy + 3 * u2 * t1 * p1y + 3 * u * t2 * p2y + t3 * p3y;
           const tMid = (t1 + (i - 1) / segs) * 0.5;
           const ct  = Math.pow(tMid, 0.65) * (0.45 + this.colorVar * 0.55);
           const col = p.lerpColor(baseCol, tipCol, ct);
           const al  = this.alpha * (1.0 - tMid * 0.45);
           p.stroke(p.red(col), p.green(col), p.blue(col), al);
-          // Near-uniform girth (rod, not cone) -- ~10% softening at the tip.
-          p.strokeWeight(this.baseW * (1.05 - tMid * 0.1));
+          // Uniform rod: same girth end-to-end.
+          p.strokeWeight(this.baseW);
           p.line(px, py, x1, y1);
           px = x1; py = y1;
         }
