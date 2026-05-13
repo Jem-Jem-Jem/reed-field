@@ -9,18 +9,36 @@ serve static content.
 
 ## Try it
 
-Open `index.html` in a browser. That's it. There's no build step, no
-dependencies to install — p5.js is loaded from a CDN.
+This repo is already deployed via GitHub Pages — visit
+**https://jem-jem-jem.github.io/reed-field/** to see it running.
 
-If your browser blocks the canvas due to file:// restrictions, serve the
-directory locally:
+## Host your own
 
-```sh
-python3 -m http.server 5500
-# then open http://localhost:5500/
+The sketch is a single HTML file with no build step. To run a copy that
+isn't dependent on this repo's deployment:
+
+**GitHub Pages (free, easy).** Fork or copy this repo, then in your fork
+go to **Settings → Pages**, set **Source** to *Deploy from a branch*,
+pick `main` and `/ (root)`, and save. Your sketch will be live at
+`https://<your-handle>.github.io/<your-repo>/` within a minute or two.
+
+**Any static host.** `index.html` is self-contained (p5.js loads from a
+CDN), so you can drop it onto anything that serves static files:
+
+- **Netlify / Vercel / Cloudflare Pages** — connect the repo, no build
+  command, publish directory is the repo root.
+- **Surge** — `npx surge .` from the repo folder.
+- **S3 / Cloudflare R2 / any object store** with static-site hosting.
+- **Your own server** — `nginx`, `caddy`, `python3 -m http.server`, etc.
+
+**Embed it.** If you just want the sketch inside another page (a
+portfolio, a Figma Sites page, etc.), embed via an `<iframe>` pointing
+at any of the URLs above:
+
+```html
+<iframe src="https://jem-jem-jem.github.io/reed-field/"
+        style="width:100%;height:100vh;border:0"></iframe>
 ```
-
-Or right-click the file in VS Code and pick **Open with Live Server**.
 
 ## What's in here
 
