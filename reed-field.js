@@ -33,12 +33,18 @@ const ReedField = (() => {
         this.dy = 0;
         this.vx = 0;
         this.vy = 0;
-        this.maxLen   = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
-        this.baseW    = rndRange(1.1, 2.6);
-        this.phase    = rnd() * Math.PI * 2;
-        this.phaseY   = rnd() * Math.PI * 2;
-        this.colorVar = rnd();
-        this.alpha    = rndRange(140, 230);
+        this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
+        this.baseW     = rndRange(1.6, 2.8);
+        // Per-reed bend personality: where the Bezier control point sits.
+        // Higher bendStiff = control point closer to the tip = stiffer-looking
+        // reed that bends near the top. bendBias gives a small lateral offset
+        // so reeds don't all curve in a perfectly symmetric arc.
+        this.bendStiff = rndRange(0.55, 0.85);
+        this.bendBias  = rndRange(-0.1, 0.1);
+        this.phase     = rnd() * Math.PI * 2;
+        this.phaseY    = rnd() * Math.PI * 2;
+        this.colorVar  = rnd();
+        this.alpha     = rndRange(140, 230);
       }
       update(path, t, cfg) {
         const sw    = cfg.swayStrength;
@@ -96,7 +102,7 @@ const ReedField = (() => {
         const bb = p.blue(baseCol)  * 0.6;
         p.fill(br, bg, bb, this.alpha * 0.55);
         p.noStroke();
-        p.ellipse(this.bx, this.by, this.baseW * 1.6, this.baseW * 1.6);
+        p.ellipse(this.bx, this.by, this.baseW * 2.5, this.baseW * 2.5);
         p.noFill();
 
         const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
@@ -104,13 +110,12 @@ const ReedField = (() => {
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
         const nx   = this.dx / mag;
         const ny   = this.dy / mag;
-        // Quadratic Bezier: base tangent is fixed straight up (0, -1) so the
-        // reed grows upward and bends toward the cursor's displacement.
-        //   P0 = base (rooted)
-        //   P1 = base + (0, -1) * vLen * 0.5  (tangent at base)
-        //   P2 = tip in the current displacement direction
-        const p1x = this.bx;
-        const p1y = this.by - vLen * 0.5;
+        // Quadratic Bezier: base tangent points straight up so the reed grows
+        // vertically and bends toward the cursor's displacement direction.
+        // The control point offset is per-reed (bendStiff, bendBias) so the
+        // field doesn't all bend in lockstep.
+        const p1x = this.bx + this.bendBias * vLen;
+        const p1y = this.by - this.bendStiff * vLen;
         const p2x = this.bx + nx * vLen;
         const p2y = this.by + ny * vLen;
         const segs = 5;
@@ -125,7 +130,8 @@ const ReedField = (() => {
           const col = p.lerpColor(baseCol, tipCol, ct);
           const al  = this.alpha * (1.0 - tMid * 0.45);
           p.stroke(p.red(col), p.green(col), p.blue(col), al);
-          p.strokeWeight(this.baseW * (1.35 - tMid * 1.1));
+          // Near-uniform girth (rod, not cone) -- ~10% softening at the tip.
+          p.strokeWeight(this.baseW * (1.05 - tMid * 0.1));
           p.line(px, py, x1, y1);
           px = x1; py = y1;
         }
