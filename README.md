@@ -4,8 +4,8 @@ A tiny interactive [p5.js](https://p5js.org/) sketch: a field of stylised reeds
 that bend away from your cursor (or finger) like grass parting in a current.
 
 Built as a hero background for embedding in a [Figma Sites](https://www.figma.com/sites/)
-page, but it's just one self-contained HTML file — drop it anywhere you can
-serve static content.
+page, but it's a plain static site (one HTML + one JS, p5.js from a CDN) so
+it'll run anywhere you can host static files.
 
 ## Try it
 
@@ -14,16 +14,16 @@ This repo is already deployed via GitHub Pages — visit
 
 ## Host your own
 
-The sketch is a single HTML file with no build step. To run a copy that
-isn't dependent on this repo's deployment:
+There's no build step — every file in the repo is a deploy artifact. To
+run a copy that isn't dependent on this repo's deployment:
 
 **GitHub Pages (free, easy).** Fork or copy this repo, then in your fork
 go to **Settings → Pages**, set **Source** to *Deploy from a branch*,
 pick `main` and `/ (root)`, and save. Your sketch will be live at
 `https://<your-handle>.github.io/<your-repo>/` within a minute or two.
 
-**Any static host.** `index.html` is self-contained (p5.js loads from a
-CDN), so you can drop it onto anything that serves static files:
+**Any static host.** Upload `index.html` and `reed-field.js` side-by-side
+(p5.js itself loads from a CDN). Anything that serves static files works:
 
 - **Netlify / Vercel / Cloudflare Pages** — connect the repo, no build
   command, publish directory is the repo root.
@@ -42,12 +42,20 @@ at any of the URLs above:
 
 ## What's in here
 
-Just the one file: `index.html`. All the markup, styles, and the sketch
-itself live inside it.
+```
+index.html       # markup + boot call (configures and starts the sketch)
+reed-field.js    # the sketch itself, exposed as a global `ReedField.init(...)`
+README.md
+```
+
+This follows the standard p5.js project layout: a minimal HTML shell that
+loads p5.js from a CDN, then loads the sketch as a separate script. Editing
+`reed-field.js` is the usual reason to open this repo; `index.html` only
+changes when you want to retheme the hosting page or tweak the boot config.
 
 ## Tuning the look
 
-Visual knobs live at the bottom of the file, in the `ReedField.init` call:
+Visual knobs live in the `ReedField.init` call inside `index.html`:
 
 ```js
 ReedField.init('reed-hero', {
@@ -58,7 +66,7 @@ ReedField.init('reed-hero', {
 });
 ```
 
-Everything else falls back to the defaults defined in the module. The full set:
+Everything else falls back to the defaults defined in `reed-field.js`. The full set:
 
 | Option            | Default     | What it does                                              |
 | ----------------- | ----------- | --------------------------------------------------------- |
@@ -67,13 +75,13 @@ Everything else falls back to the defaults defined in the module. The full set:
 | `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
 | `influenceRadius` | `115`       | Radius (px) around the cursor that bends reeds            |
 | `forceStrength`   | `8`         | How hard the cursor pushes reeds inside that radius       |
-| `stiffness`       | `0.044`     | Spring pull back to rest pose (lower = looser)            |
-| `damping`         | `0.87`      | Velocity decay (lower = quicker to settle)                |
+| `stiffness`       | `0.03`      | Spring pull back to rest pose (lower = looser)            |
+| `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
 | `reedLengthMin`   | `18`        | Minimum per-reed render length                            |
 | `reedLengthMax`   | `42`        | Maximum per-reed render length                            |
-| `bgColor`         | `#0b0f0c`   | Canvas background                                         |
-| `baseColor`       | `#1e3320`   | Color at the reed's root                                  |
-| `tipColor`        | `#c49030`   | Color at the reed's tip                                   |
+| `bgColor`         | `#1c2252`   | Canvas background                                         |
+| `baseColor`       | `#faa61a`   | Color at the reed's root                                  |
+| `tipColor`        | `#faa61a`   | Color at the reed's tip                                   |
 | `aspectRatio`     | `null`      | If set, canvas height = width × ratio; otherwise fills    |
 | `autoMobileScale` | `true`      | Auto-drop reedCount on narrow viewports (only if unset)   |
 
