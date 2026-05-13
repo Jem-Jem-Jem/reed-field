@@ -9,7 +9,7 @@ serve static content.
 
 ## Try it
 
-Open `reed-field.html` in a browser. That's it. There's no build step, no
+Open `index.html` in a browser. That's it. There's no build step, no
 dependencies to install — p5.js is loaded from a CDN.
 
 If your browser blocks the canvas due to file:// restrictions, serve the
@@ -17,14 +17,14 @@ directory locally:
 
 ```sh
 python3 -m http.server 5500
-# then open http://localhost:5500/reed-field.html
+# then open http://localhost:5500/
 ```
 
 Or right-click the file in VS Code and pick **Open with Live Server**.
 
 ## What's in here
 
-Just the one file: `reed-field.html`. All the markup, styles, and the sketch
+Just the one file: `index.html`. All the markup, styles, and the sketch
 itself live inside it.
 
 ## Tuning the look
