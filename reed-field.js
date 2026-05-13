@@ -22,7 +22,7 @@ const ReedField = (() => {
 
   function makeReedClass(p, cfg) {
     class Reed {
-      static DOT_DIAM = 2;
+      static DOT_DIAM = 3;
       constructor(x, y) {
         this.bx = x;
         this.by = y;
