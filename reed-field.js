@@ -35,7 +35,7 @@ const ReedField = (() => {
         this.vx = 0;
         this.vy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
-        this.baseW     = rndRange(1.6, 2.8);
+        this.baseW     = rndRange(0.8, 1.4);
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
@@ -173,31 +173,6 @@ const ReedField = (() => {
     const bgBl = parseInt(cfg.bgColor.slice(5, 7), 16);
     g.noStroke();
     g.background(bgR, bgG, bgBl);
-    p.noiseSeed(cfg.seed + 7391);
-    const step = 7;
-    for (let y = 0; y < g.height + step; y += step) {
-      for (let x = 0; x < g.width + step; x += step) {
-        const n  = p.noise(x * 0.010, y * 0.010);
-        const n2 = p.noise(x * 0.022 + 400, y * 0.022 + 400);
-        const v  = (n * 0.68 + n2 * 0.32 - 0.5) * 22;
-        g.fill(
-          p.constrain(bgR + v, 0, 255),
-          p.constrain(bgG + v, 0, 255),
-          p.constrain(bgBl + v, 0, 255),
-          78
-        );
-        g.rect(x, y, step, step);
-      }
-    }
-    const cx = g.width * 0.5, cy = g.height * 0.5;
-    const maxD = Math.sqrt(cx * cx + cy * cy);
-    for (let r = 0; r < 6; r++) {
-      const t   = r / 5;
-      const rad = maxD * (0.55 + t * 0.55);
-      g.fill(0, t * t * 55);
-      g.noStroke();
-      g.ellipse(cx, cy, rad * 2, rad * 2);
-    }
     return g;
   }
 
