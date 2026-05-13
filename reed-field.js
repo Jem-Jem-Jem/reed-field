@@ -25,12 +25,12 @@ const ReedField = (() => {
       constructor(x, y) {
         this.bx = x;
         this.by = y;
-        const rA = rnd() * Math.PI * 2;
-        const rM = rndRange(2.5, 9.5);
-        this.restDx = Math.cos(rA) * rM;
-        this.restDy = Math.sin(rA) * rM;
-        this.dx = this.restDx;
-        this.dy = this.restDy;
+        // Uniform rest pose: every reed sits at zero displacement
+        // (a dot at the base) and grows straight up when disturbed.
+        this.restDx = 0;
+        this.restDy = 0;
+        this.dx = 0;
+        this.dy = 0;
         this.vx = 0;
         this.vy = 0;
         this.maxLen   = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
@@ -90,21 +90,27 @@ const ReedField = (() => {
         this.dy += this.vy;
       }
       draw(baseCol, tipCol) {
+        // Base dot is always rendered so every reed is visible at rest.
+        const br = p.red(baseCol)   * 0.6;
+        const bg = p.green(baseCol) * 0.6;
+        const bb = p.blue(baseCol)  * 0.6;
+        p.fill(br, bg, bb, this.alpha * 0.55);
+        p.noStroke();
+        p.ellipse(this.bx, this.by, this.baseW * 1.6, this.baseW * 1.6);
+        p.noFill();
+
         const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
         if (mag < 0.25) return;
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
         const nx   = this.dx / mag;
         const ny   = this.dy / mag;
-        // Quadratic Bezier so the reed bends rather than just rotating:
-        //   P0 = base (stays rooted)
-        //   P1 = control point along the rest direction at half length
-        //   P2 = tip pointed in the current displacement direction
-        // At rest, restDir == currDir and the curve collapses to a straight line.
-        const restMag = Math.sqrt(this.restDx * this.restDx + this.restDy * this.restDy);
-        const rnx = restMag > 0.0001 ? this.restDx / restMag : nx;
-        const rny = restMag > 0.0001 ? this.restDy / restMag : ny;
-        const p1x = this.bx + rnx * vLen * 0.5;
-        const p1y = this.by + rny * vLen * 0.5;
+        // Quadratic Bezier: base tangent is fixed straight up (0, -1) so the
+        // reed grows upward and bends toward the cursor's displacement.
+        //   P0 = base (rooted)
+        //   P1 = base + (0, -1) * vLen * 0.5  (tangent at base)
+        //   P2 = tip in the current displacement direction
+        const p1x = this.bx;
+        const p1y = this.by - vLen * 0.5;
         const p2x = this.bx + nx * vLen;
         const p2y = this.by + ny * vLen;
         const segs = 5;
@@ -123,13 +129,6 @@ const ReedField = (() => {
           p.line(px, py, x1, y1);
           px = x1; py = y1;
         }
-        const br = p.red(baseCol)   * 0.6;
-        const bg = p.green(baseCol) * 0.6;
-        const bb = p.blue(baseCol)  * 0.6;
-        p.fill(br, bg, bb, this.alpha * 0.55);
-        p.noStroke();
-        p.ellipse(this.bx, this.by, this.baseW * 1.6, this.baseW * 1.6);
-        p.noFill();
       }
     };
   }
