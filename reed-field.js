@@ -21,7 +21,8 @@ const ReedField = (() => {
   const rndRange = (lo, hi) => lo + rnd() * (hi - lo);
 
   function makeReedClass(p, cfg) {
-    return class Reed {
+    class Reed {
+      static DOT_DIAM = 6;
       constructor(x, y) {
         this.bx = x;
         this.by = y;
@@ -46,6 +47,10 @@ const ReedField = (() => {
         this.bendBaseLen = rndRange(0.10, 0.22);
         this.bendTipLen  = rndRange(0.40, 0.60);
         this.bendBias    = rndRange(-0.05, 0.05);
+        // Tip resists outward bending: tip endpoint and tangent are blended
+        // between the displacement direction and straight up, so the tip
+        // stays closer to vertical even when the reed is pushed hard.
+        this.tipResist = rndRange(0.30, 0.50);
         this.phase     = rnd() * Math.PI * 2;
         this.phaseY    = rnd() * Math.PI * 2;
         this.colorVar  = rnd();
@@ -102,10 +107,10 @@ const ReedField = (() => {
       }
       draw(baseCol, tipCol) {
         // Base dot is always rendered so every reed is visible at rest.
-        // Use baseCol directly (no darkening) so dots match the reed color.
-        p.fill(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha * 0.55);
+        // Uniform size across reeds, full reed color (no darkening).
+        p.fill(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
         p.noStroke();
-        p.ellipse(this.bx, this.by, this.baseW * 2.5, this.baseW * 2.5);
+        p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
         p.noFill();
 
         const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
@@ -113,46 +118,52 @@ const ReedField = (() => {
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
         const nx   = this.dx / mag;
         const ny   = this.dy / mag;
-        // Cubic Bezier so curvature can be concentrated near the base while
-        // the mid-to-tip section runs nearly straight along the displacement
-        // direction:
+        // Tip resists the outward bend: blend the tip direction between the
+        // raw displacement direction (nx, ny) and straight up (0, -1). The
+        // result is the unit direction the tip points in.
+        const r    = this.tipResist;
+        let tdx    = nx * (1 - r);
+        let tdy    = ny * (1 - r) - r;
+        const tmag = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+        const tnx  = tdx / tmag;
+        const tny  = tdy / tmag;
+        // Cubic Bezier with curvature concentrated near the base:
         //   P0 = base (rooted)
-        //   P1 = base + tangent-up * bendBaseLen * vLen  (short -> sharp early bend)
-        //   P2 = tip - displacement-dir * bendTipLen * vLen  (long -> calm tip)
-        //   P3 = tip in displacement direction
+        //   P1 = base + (bendBias, -bendBaseLen) * vLen  -> short up tangent
+        //   P2 = tip - (tnx, tny) * bendTipLen * vLen    -> calm tip
+        //   P3 = tip along the tip-resist-blended direction
         const bxx = this.bx;
         const byy = this.by;
-        const p3x = bxx + nx * vLen;
-        const p3y = byy + ny * vLen;
+        const p3x = bxx + tnx * vLen;
+        const p3y = byy + tny * vLen;
         const baseLen = vLen * this.bendBaseLen;
         const tipLen  = vLen * this.bendTipLen;
         const p1x = bxx + this.bendBias * vLen;
         const p1y = byy - baseLen;
-        const p2x = p3x - nx * tipLen;
-        const p2y = p3y - ny * tipLen;
+        const p2x = p3x - tnx * tipLen;
+        const p2y = p3y - tny * tipLen;
         const segs = 5;
         let px = bxx, py = byy;
         for (let i = 1; i <= segs; i++) {
-          const t1   = i / segs;
-          const u    = 1 - t1;
-          const u2   = u * u;
-          const u3   = u2 * u;
-          const t2   = t1 * t1;
-          const t3   = t2 * t1;
-          const x1   = u3 * bxx + 3 * u2 * t1 * p1x + 3 * u * t2 * p2x + t3 * p3x;
-          const y1   = u3 * byy + 3 * u2 * t1 * p1y + 3 * u * t2 * p2y + t3 * p3y;
-          const tMid = (t1 + (i - 1) / segs) * 0.5;
-          const ct  = Math.pow(tMid, 0.65) * (0.45 + this.colorVar * 0.55);
-          const col = p.lerpColor(baseCol, tipCol, ct);
-          const al  = this.alpha * (1.0 - tMid * 0.45);
-          p.stroke(p.red(col), p.green(col), p.blue(col), al);
-          // Uniform rod: same girth end-to-end.
+          const t1 = i / segs;
+          const u  = 1 - t1;
+          const u2 = u * u;
+          const u3 = u2 * u;
+          const t2 = t1 * t1;
+          const t3 = t2 * t1;
+          const x1 = u3 * bxx + 3 * u2 * t1 * p1x + 3 * u * t2 * p2x + t3 * p3x;
+          const y1 = u3 * byy + 3 * u2 * t1 * p1y + 3 * u * t2 * p2y + t3 * p3y;
+          // Uniform rod: same color and opacity end-to-end. baseCol == tipCol
+          // currently, so lerpColor is a no-op; this stays correct if they
+          // diverge in future.
+          p.stroke(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
           p.strokeWeight(this.baseW);
           p.line(px, py, x1, y1);
           px = x1; py = y1;
         }
       }
-    };
+    }
+    return Reed;
   }
 
   function buildBackground(p, cfg) {
@@ -259,10 +270,8 @@ const ReedField = (() => {
         const spY    = p.height / rows;
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const jx = (rnd() - 0.5) * spX * 0.88;
-            const jy = (rnd() - 0.5) * spY * 0.88;
-            const x  = p.constrain((c + 0.5) * spX + jx, 1, p.width  - 1);
-            const y  = p.constrain((r + 0.5) * spY + jy, 1, p.height - 1);
+            const x = p.constrain((c + 0.5) * spX, 1, p.width  - 1);
+            const y = p.constrain((r + 0.5) * spY, 1, p.height - 1);
             reeds.push(new Reed(x, y));
           }
         }
