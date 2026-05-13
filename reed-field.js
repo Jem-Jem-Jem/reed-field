@@ -95,21 +95,33 @@ const ReedField = (() => {
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
         const nx   = this.dx / mag;
         const ny   = this.dy / mag;
-        const segs = 4;
-        for (let i = 0; i < segs; i++) {
-          const t0   = i / segs;
-          const t1   = (i + 1) / segs;
-          const tMid = (t0 + t1) * 0.5;
-          const x0 = this.bx + nx * t0 * vLen;
-          const y0 = this.by + ny * t0 * vLen;
-          const x1 = this.bx + nx * t1 * vLen;
-          const y1 = this.by + ny * t1 * vLen;
+        // Quadratic Bezier so the reed bends rather than just rotating:
+        //   P0 = base (stays rooted)
+        //   P1 = control point along the rest direction at half length
+        //   P2 = tip pointed in the current displacement direction
+        // At rest, restDir == currDir and the curve collapses to a straight line.
+        const restMag = Math.sqrt(this.restDx * this.restDx + this.restDy * this.restDy);
+        const rnx = restMag > 0.0001 ? this.restDx / restMag : nx;
+        const rny = restMag > 0.0001 ? this.restDy / restMag : ny;
+        const p1x = this.bx + rnx * vLen * 0.5;
+        const p1y = this.by + rny * vLen * 0.5;
+        const p2x = this.bx + nx * vLen;
+        const p2y = this.by + ny * vLen;
+        const segs = 5;
+        let px = this.bx, py = this.by;
+        for (let i = 1; i <= segs; i++) {
+          const t1   = i / segs;
+          const u    = 1 - t1;
+          const x1   = u * u * this.bx + 2 * u * t1 * p1x + t1 * t1 * p2x;
+          const y1   = u * u * this.by + 2 * u * t1 * p1y + t1 * t1 * p2y;
+          const tMid = (t1 + (i - 1) / segs) * 0.5;
           const ct  = Math.pow(tMid, 0.65) * (0.45 + this.colorVar * 0.55);
           const col = p.lerpColor(baseCol, tipCol, ct);
           const al  = this.alpha * (1.0 - tMid * 0.45);
           p.stroke(p.red(col), p.green(col), p.blue(col), al);
           p.strokeWeight(this.baseW * (1.35 - tMid * 1.1));
-          p.line(x0, y0, x1, y1);
+          p.line(px, py, x1, y1);
+          px = x1; py = y1;
         }
         const br = p.red(baseCol)   * 0.6;
         const bg = p.green(baseCol) * 0.6;
