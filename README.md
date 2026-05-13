@@ -59,10 +59,11 @@ Visual knobs live in the `ReedField.init` call inside `index.html`:
 
 ```js
 ReedField.init('reed-hero', {
-  reedCount: window.innerWidth < 768 ? 1000 : 2000,
-  influenceRadius: window.innerWidth < 768 ? 50 : 100,
-  reedLengthMin: 36,
-  reedLengthMax: 80,
+  reedCount: 2000,
+  influenceRadius: 75,
+  reedLengthMin: 8,
+  reedLengthMax: 10,
+  swayStrength: 0,
 });
 ```
 
@@ -74,8 +75,8 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `reedCount`       | `1300`      | How many reeds to place across the canvas                 |
 | `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
 | `influenceRadius` | `115`       | Radius (px) around the cursor that bends reeds            |
-| `forceStrength`   | `8`         | How hard the cursor pushes reeds inside that radius       |
-| `stiffness`       | `0.03`      | Spring pull back to rest pose (lower = looser)            |
+| `forceStrength`   | `14`        | How hard the cursor pushes reeds inside that radius       |
+| `stiffness`       | `0.02`      | Spring pull back to rest pose (lower = looser)            |
 | `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
 | `reedLengthMin`   | `18`        | Minimum per-reed render length                            |
 | `reedLengthMax`   | `42`        | Maximum per-reed render length                            |
