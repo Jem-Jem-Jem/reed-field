@@ -50,7 +50,7 @@ const ReedField = (() => {
         // Tip resists outward bending: tip endpoint and tangent are blended
         // between the displacement direction and straight up, so the tip
         // stays closer to vertical even when the reed is pushed hard.
-        this.tipResist = rndRange(0.30, 0.50);
+        this.tipResist = rndRange(0.10, 0.25);
         this.phase     = rnd() * Math.PI * 2;
         this.phaseY    = rnd() * Math.PI * 2;
         this.colorVar  = rnd();
