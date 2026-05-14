@@ -35,7 +35,7 @@ const ReedField = (() => {
         this.vx = 0;
         this.vy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
-        this.baseW     = rndRange(0.8, 1.4);
+        this.baseW     = rndRange(1.5, 1.5);
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
