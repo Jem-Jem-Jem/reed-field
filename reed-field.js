@@ -34,8 +34,13 @@ const ReedField = (() => {
         this.dy = 0;
         this.vx = 0;
         this.vy = 0;
+        // Separate channel for click-wave displacement (stiffer spring, higher damping).
+        this.wdx = 0;
+        this.wdy = 0;
+        this.wvx = 0;
+        this.wvy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
-        this.baseW     = rndRange(1.5, 1.5);
+        this.baseW     = 1.5;
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
@@ -56,10 +61,40 @@ const ReedField = (() => {
         this.colorVar  = rnd();
         this.alpha     = rndRange(140, 230);
       }
-      update(path, t, cfg) {
+      update(path, t, cfg, waves) {
         const sw    = cfg.swayStrength;
         const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
         const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
+
+        // Wave channel — independent stiffness/damping for crisp snap-back.
+        let wfx = 0, wfy = 0;
+        if (waves && waves.length > 0) {
+          for (const wave of waves) {
+            const wcx = this.bx - wave.cx;
+            const wcy = this.by - wave.cy;
+            const d   = Math.sqrt(wcx * wcx + wcy * wcy);
+            const half = cfg.waveWidth * 0.5;
+            const diff = Math.abs(d - wave.radius);
+            if (diff < half && d > 0.1) {
+              const fade = (1 - diff / half) * wave.strength;
+              wfx += (wcx / d) * fade;
+              wfy += (wcy / d) * fade;
+            }
+          }
+        }
+        const wspX = -this.wdx * cfg.waveStiffness;
+        const wspY = -this.wdy * cfg.waveStiffness;
+        this.wvx = (this.wvx + wfx + wspX) * cfg.waveDamping;
+        this.wvy = (this.wvy + wfy + wspY) * cfg.waveDamping;
+        this.wdx += this.wvx;
+        this.wdy += this.wvy;
+        // Dead-zone: snap to rest once energy is negligible, preventing residual
+        // oscillation from bleeding into the cursor channel's visual.
+        if (Math.abs(this.wdx) + Math.abs(this.wdy) + Math.abs(this.wvx) + Math.abs(this.wvy) < 0.15) {
+          this.wdx = this.wdy = this.wvx = this.wvy = 0;
+        }
+
+        // Cursor / sway channel — original settings unchanged.
         let forceX = 0, forceY = 0;
         if (path && path.length > 0) {
           let minD2 = Infinity, minCx = 0, minCy = 0;
@@ -113,11 +148,13 @@ const ReedField = (() => {
         p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
         p.noFill();
 
-        const mag = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+        const sdx  = this.dx + this.wdx;
+        const sdy  = this.dy + this.wdy;
+        const mag  = Math.sqrt(sdx * sdx + sdy * sdy);
         if (mag < 0.25) return;
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
-        const nx   = this.dx / mag;
-        const ny   = this.dy / mag;
+        const nx   = sdx / mag;
+        const ny   = sdy / mag;
         // Tip resists the outward bend: blend the tip direction between the
         // raw displacement direction (nx, ny) and straight up (0, -1). The
         // result is the unit direction the tip points in.
@@ -142,6 +179,8 @@ const ReedField = (() => {
         const p1y = byy - baseLen;
         const p2x = p3x - tnx * tipLen;
         const p2y = p3y - tny * tipLen;
+        p.stroke(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
+        p.strokeWeight(this.baseW);
         const segs = 5;
         let px = bxx, py = byy;
         for (let i = 1; i <= segs; i++) {
@@ -153,11 +192,6 @@ const ReedField = (() => {
           const t3 = t2 * t1;
           const x1 = u3 * bxx + 3 * u2 * t1 * p1x + 3 * u * t2 * p2x + t3 * p3x;
           const y1 = u3 * byy + 3 * u2 * t1 * p1y + 3 * u * t2 * p2y + t3 * p3y;
-          // Uniform rod: same color and opacity end-to-end. baseCol == tipCol
-          // currently, so lerpColor is a no-op; this stays correct if they
-          // diverge in future.
-          p.stroke(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
-          p.strokeWeight(this.baseW);
           p.line(px, py, x1, y1);
           px = x1; py = y1;
         }
@@ -183,8 +217,8 @@ const ReedField = (() => {
       swayStrength:    2.5,
       influenceRadius: 115,
       forceStrength:   14,
-      stiffness:       0.02,
-      damping:         0.88,
+      stiffness:       0.05,
+      damping:         0.82,
       reedLengthMin:   18,
       reedLengthMax:   42,
       bgColor:         '#1c2252',
@@ -192,6 +226,12 @@ const ReedField = (() => {
       tipColor:        '#faa61a',
       aspectRatio:     null,   // null = fill container height
       autoMobileScale: true,
+      waveSpeed:       12,     // px/frame wavefront expansion
+      waveWidth:       8,      // ring thickness in px
+      waveStrength:    28,     // peak outward force at wavefront
+      waveMaxRadius:   800,    // wave dies beyond this radius
+      waveStiffness:   0.9,    // spring stiffness for wave channel (stiffer = faster snap-back)
+      waveDamping:     0.35,   // damping for wave channel (lower = faster decay)
     }, userConfig);
 
     // Auto-tune for small/touch screens (only if user didn't override)
@@ -211,6 +251,7 @@ const ReedField = (() => {
       const PATH_CAP    = 32;
       let Reed;
       let cnv;
+      let waves         = [];       // active click waves
       const container   = document.getElementById(containerId);
 
       function canvasHeight() {
@@ -233,6 +274,7 @@ const ReedField = (() => {
       }
 
       function initSystem() {
+        waves.length = 0;
         seedRNG(cfg.seed);
         Reed     = makeReedClass(p, cfg);
         bgBuffer = buildBackground(p, cfg);
@@ -281,6 +323,14 @@ const ReedField = (() => {
         prevTail = null;
       }
 
+      function handleClick(e) {
+        const rect = cnv.elt.getBoundingClientRect();
+        const cx = (e.clientX != null ? e.clientX : e.changedTouches[0].clientX) - rect.left;
+        const cy = (e.clientY != null ? e.clientY : e.changedTouches[0].clientY) - rect.top;
+        waves.length = 0;
+        waves.push({ cx, cy, radius: 0, strength: cfg.waveStrength });
+      }
+
       p.setup = () => {
         const w = container.offsetWidth || 800;
         const h = canvasHeight();
@@ -316,6 +366,9 @@ const ReedField = (() => {
           cnv.elt.addEventListener('touchend', resetPointer);
         }
 
+        // Click wave: fires on mouse click and touch tap.
+        cnv.elt.addEventListener('click', handleClick);
+
         initSystem();
       };
 
@@ -348,10 +401,16 @@ const ReedField = (() => {
           if (framePath.length === 0 && lastMX > -99999) framePath = [[lastMX, lastMY]];
         }
 
+        // Expand waves, prune dead ones.
+        for (let i = waves.length - 1; i >= 0; i--) {
+          waves[i].radius += cfg.waveSpeed;
+          if (waves[i].radius > cfg.waveMaxRadius) waves.splice(i, 1);
+        }
+
         p.image(bgBuffer, 0, 0);
 
         for (const reed of reeds) {
-          reed.update(framePath, t, cfg);
+          reed.update(framePath, t, cfg, waves);
           reed.draw(baseCol, tipCol);
         }
 
