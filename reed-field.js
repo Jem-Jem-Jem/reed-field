@@ -74,7 +74,13 @@ const ReedField = (() => {
             const wcy = this.by - wave.cy;
             const d   = Math.sqrt(wcx * wcx + wcy * wcy);
             const half = cfg.waveWidth * 0.5;
-            const diff = Math.abs(d - wave.radius);
+            // Test against the full band swept this frame, not just the current
+            // ring position. Without this, waveSpeed > waveWidth leaves dead zones
+            // between consecutive ring positions — reeds at those distances are
+            // never within half of wave.radius at any single frame.
+            const prevRadius  = wave.radius - cfg.waveSpeed;
+            const ringNearest = Math.max(prevRadius, Math.min(wave.radius, d));
+            const diff = Math.abs(d - ringNearest);
             if (diff < half && d > 0.1) {
               const fade = (1 - diff / half) * wave.strength;
               wfx += (wcx / d) * fade;
