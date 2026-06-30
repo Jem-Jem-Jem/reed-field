@@ -323,11 +323,9 @@ const ReedField = (() => {
         prevTail = null;
       }
 
-      function handleClick(e) {
+      function spawnWave(clientX, clientY) {
         const rect = cnv.elt.getBoundingClientRect();
-        const cx = (e.clientX != null ? e.clientX : e.changedTouches[0].clientX) - rect.left;
-        const cy = (e.clientY != null ? e.clientY : e.changedTouches[0].clientY) - rect.top;
-        waves.push({ cx, cy, radius: 0, strength: cfg.waveStrength });
+        waves.push({ cx: clientX - rect.left, cy: clientY - rect.top, radius: 0, strength: cfg.waveStrength });
       }
 
       p.setup = () => {
@@ -347,6 +345,7 @@ const ReedField = (() => {
           cnv.elt.addEventListener('pointerenter',  handlePointerEvent);
           cnv.elt.addEventListener('pointermove',   handlePointerEvent);
           cnv.elt.addEventListener('pointerdown',   handlePointerEvent);
+          cnv.elt.addEventListener('pointerdown',   e => spawnWave(e.clientX, e.clientY));
           cnv.elt.addEventListener('pointerleave',  resetPointer);
           cnv.elt.addEventListener('pointercancel', resetPointer);
         } else {
@@ -354,8 +353,10 @@ const ReedField = (() => {
           cnv.elt.addEventListener('mouseenter', e => updateFromClient(e.clientX, e.clientY));
           cnv.elt.addEventListener('mousemove',  e => updateFromClient(e.clientX, e.clientY));
           cnv.elt.addEventListener('mouseleave', resetPointer);
+          cnv.elt.addEventListener('mousedown',  e => spawnWave(e.clientX, e.clientY));
           cnv.elt.addEventListener('touchstart', e => {
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
+            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
             e.preventDefault();
           }, { passive: false });
           cnv.elt.addEventListener('touchmove', e => {
@@ -364,9 +365,6 @@ const ReedField = (() => {
           }, { passive: false });
           cnv.elt.addEventListener('touchend', resetPointer);
         }
-
-        // Click wave: fires on mouse click and touch tap.
-        cnv.elt.addEventListener('click', handleClick);
 
         initSystem();
       };
