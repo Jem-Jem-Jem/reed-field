@@ -66,25 +66,41 @@ const ReedField = (() => {
         const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
         const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
 
-        // Wave channel — independent stiffness/damping for crisp snap-back.
+        // Wave channel — sinusoidal profile: outward crest + inward trough.
+        // When two waves overlap, forces sum → constructive/destructive interference.
         let wfx = 0, wfy = 0;
         if (waves && waves.length > 0) {
+          const half      = cfg.waveWidth * 0.5;
+          const troughLen = cfg.waveWidth * 2;
           for (const wave of waves) {
             const wcx = this.bx - wave.cx;
             const wcy = this.by - wave.cy;
             const d   = Math.sqrt(wcx * wcx + wcy * wcy);
-            const half = cfg.waveWidth * 0.5;
-            // Test against the full band swept this frame, not just the current
-            // ring position. Without this, waveSpeed > waveWidth leaves dead zones
-            // between consecutive ring positions — reeds at those distances are
-            // never within half of wave.radius at any single frame.
-            const prevRadius  = wave.radius - cfg.waveSpeed;
+            if (d < 0.1) continue;
+
+            const prevRadius = wave.radius - cfg.waveSpeed;
+            // Quick cull: outside both crest leading edge and trough trailing edge.
+            if (d > wave.radius + half || d < prevRadius - half - troughLen) continue;
+
+            // Swept-band: nearest ring position during this frame's expansion.
+            // Signed diff: + = outside ring (not yet reached); − = inside (already passed).
             const ringNearest = Math.max(prevRadius, Math.min(wave.radius, d));
-            const diff = Math.abs(d - ringNearest);
-            if (diff < half && d > 0.1) {
-              const fade = (1 - diff / half) * wave.strength;
-              wfx += (wcx / d) * fade;
-              wfy += (wcy / d) * fade;
+            const diff        = d - ringNearest;
+
+            let force = 0;
+            if (diff >= -half && diff <= half) {
+              // Crest — triangular outward push centred on wavefront.
+              force = (1 - Math.abs(diff) / half) * wave.strength;
+            } else if (diff < -half && diff >= -(half + troughLen)) {
+              // Trough — sinusoidal inward pull trailing the crest.
+              // Enables destructive interference where a trough meets another wave's crest.
+              const t = (-diff - half) / troughLen;
+              force   = -Math.sin(t * Math.PI) * wave.strength * cfg.waveTroughStrength;
+            }
+
+            if (force !== 0) {
+              wfx += (wcx / d) * force;
+              wfy += (wcy / d) * force;
             }
           }
         }
@@ -232,12 +248,13 @@ const ReedField = (() => {
       tipColor:        '#faa61a',
       aspectRatio:     null,   // null = fill container height
       autoMobileScale: true,
-      waveSpeed:       12,     // px/frame wavefront expansion
-      waveWidth:       8,      // ring thickness in px
-      waveStrength:    28,     // peak outward force at wavefront
-      waveMaxRadius:   800,    // wave dies beyond this radius
-      waveStiffness:   0.9,    // spring stiffness for wave channel (stiffer = faster snap-back)
-      waveDamping:     0.35,   // damping for wave channel (lower = faster decay)
+      waveSpeed:          12,   // px/frame wavefront expansion
+      waveWidth:          8,    // crest half-wavelength in px
+      waveStrength:       28,   // peak outward force at wavefront
+      waveMaxRadius:      800,  // wave dies beyond this radius
+      waveStiffness:      0.9,  // spring stiffness for wave channel (stiffer = faster snap-back)
+      waveDamping:        0.35, // damping for wave channel (lower = faster decay)
+      waveTroughStrength: 0.7,  // inward trough amplitude as fraction of crest (enables interference)
     }, userConfig);
 
     // Auto-tune for small/touch screens (only if user didn't override)
