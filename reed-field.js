@@ -327,7 +327,6 @@ const ReedField = (() => {
         const rect = cnv.elt.getBoundingClientRect();
         const cx = (e.clientX != null ? e.clientX : e.changedTouches[0].clientX) - rect.left;
         const cy = (e.clientY != null ? e.clientY : e.changedTouches[0].clientY) - rect.top;
-        waves.length = 0;
         waves.push({ cx, cy, radius: 0, strength: cfg.waveStrength });
       }
 
