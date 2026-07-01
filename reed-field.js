@@ -61,7 +61,7 @@ const ReedField = (() => {
         this.colorVar  = rnd();
         this.alpha     = rndRange(140, 230);
       }
-      update(path, t, cfg, waves) {
+      update(path, t, cfg, waves, infR) {
         const sw    = cfg.swayStrength;
         const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
         const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
@@ -144,10 +144,10 @@ const ReedField = (() => {
               if (d2 < minD2) { minD2 = d2; minCx = cx; minCy = cy; }
             }
           }
-          const r2 = cfg.influenceRadius * cfg.influenceRadius;
+          const r2 = infR * infR;
           if (minD2 < r2 && minD2 > 0.25) {
             const dist = Math.sqrt(minD2);
-            const t1 = 1.0 - dist / cfg.influenceRadius;
+            const t1 = 1.0 - dist / infR;
             const fm = t1 * t1 * cfg.forceStrength;
             forceX = (minCx / dist) * fm;
             forceY = (minCy / dist) * fm;
@@ -219,7 +219,8 @@ const ReedField = (() => {
       seed:            42,
       reedCount:       1300,
       swayStrength:    2.5,
-      influenceRadius: 115,
+      influenceRadiusCursor: 16,  // mouse/pen — matches system pointer glyph footprint
+      influenceRadiusTouch:  28,  // touch — thumb-pad contact estimate, retune by feel
       forceStrength:   14,
       stiffness:       0.05,
       damping:         0.82,
@@ -255,6 +256,7 @@ const ReedField = (() => {
       let lastMY        = -99999;
       let pathBuf       = [];       // cursor samples accumulated since last frame
       let prevTail      = null;     // last point from previous frame (joins polyline across frames)
+      let lastPointerType = 'mouse'; // 'mouse' | 'pen' | 'touch' — picks influenceRadiusCursor/Touch
       const PATH_CAP    = 32;
       let Reed;
       let cnv;
@@ -314,6 +316,7 @@ const ReedField = (() => {
       }
 
       function handlePointerEvent(e) {
+        lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
         // Use coalesced sub-frame samples when the browser provides them, so
         // fast cursor motion is captured as a polyline rather than a single point.
         const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
@@ -356,6 +359,7 @@ const ReedField = (() => {
           cnv.elt.addEventListener('pointermove',   e => { if (e.isPrimary) handlePointerEvent(e); });
           cnv.elt.addEventListener('pointerdown',   e => {
             if (e.isPrimary) {
+              lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
               // Set cursor position on initial contact without adding a path sample.
               lastMX = e.clientX - canvasRect.left;
               lastMY = e.clientY - canvasRect.top;
@@ -368,16 +372,18 @@ const ReedField = (() => {
           cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
         } else {
           // Fallback for older browsers.
-          cnv.elt.addEventListener('mouseenter', e => updateFromClient(e.clientX, e.clientY));
-          cnv.elt.addEventListener('mousemove',  e => updateFromClient(e.clientX, e.clientY));
+          cnv.elt.addEventListener('mouseenter', e => { lastPointerType = 'mouse'; updateFromClient(e.clientX, e.clientY); });
+          cnv.elt.addEventListener('mousemove',  e => { lastPointerType = 'mouse'; updateFromClient(e.clientX, e.clientY); });
           cnv.elt.addEventListener('mouseleave', resetPointer);
           cnv.elt.addEventListener('mousedown',  e => spawnWave(e.clientX, e.clientY));
           cnv.elt.addEventListener('touchstart', e => {
+            lastPointerType = 'touch';
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
             e.preventDefault();
           }, { passive: false });
           cnv.elt.addEventListener('touchmove', e => {
+            lastPointerType = 'touch';
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             e.preventDefault();
           }, { passive: false });
@@ -422,11 +428,13 @@ const ReedField = (() => {
           if (waves[i].radius > waveMaxRadiusEff) waves.splice(i, 1);
         }
 
+        const infR = lastPointerType === 'touch' ? cfg.influenceRadiusTouch : cfg.influenceRadiusCursor;
+
         p.image(bgBuffer, 0, 0);
 
         p.strokeWeight(Reed.BASE_W);
         for (const reed of reeds) {
-          reed.update(framePath, t, cfg, waves);
+          reed.update(framePath, t, cfg, waves, infR);
           reed.draw(baseR, baseG, baseB);
         }
 
@@ -434,7 +442,7 @@ const ReedField = (() => {
           p.noFill();
           p.stroke(255, 255, 255, 7);
           p.strokeWeight(0.75);
-          p.ellipse(lastMX, lastMY, cfg.influenceRadius * 2, cfg.influenceRadius * 2);
+          p.ellipse(lastMX, lastMY, infR * 2, infR * 2);
           p.stroke(255, 255, 255, 35);
           p.strokeWeight(1.8);
           p.point(lastMX, lastMY);
