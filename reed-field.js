@@ -424,12 +424,12 @@ const ReedField = (() => {
       p.draw = () => {
         const t = p.frameCount * 0.016;
 
-        // Assemble the cursor polyline for this frame: previous frame's
-        // tail (so segments span frame boundaries) + this frame's samples.
+        // Assemble the cursor polyline for this frame only when the pointer
+        // actually moved (pathBuf has samples). A stationary cursor exerts no
+        // force — reed displacement is driven by movement, not presence.
         let framePath = null;
-        if (pointerInside) {
+        if (pointerInside && pathBuf.length > 0) {
           framePath = prevTail ? [prevTail].concat(pathBuf) : pathBuf.slice();
-          if (framePath.length === 0 && lastMX > -99999) framePath = [[lastMX, lastMY]];
         }
 
         // Expand waves, prune dead ones.
