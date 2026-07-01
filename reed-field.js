@@ -365,12 +365,23 @@ const ReedField = (() => {
 
         // Pointer events cover mouse, pen and touch in one place.
         if (window.PointerEvent) {
-          cnv.elt.addEventListener('pointerenter',  handlePointerEvent);
-          cnv.elt.addEventListener('pointermove',   handlePointerEvent);
-          cnv.elt.addEventListener('pointerdown',   handlePointerEvent);
-          cnv.elt.addEventListener('pointerdown',   e => spawnWave(e.clientX, e.clientY));
-          cnv.elt.addEventListener('pointerleave',  resetPointer);
-          cnv.elt.addEventListener('pointercancel', resetPointer);
+          // Cursor tracking is primary-pointer only and path samples only on move,
+          // so secondary touches don't inject line segments between touch points.
+          cnv.elt.addEventListener('pointerenter',  e => { if (e.isPrimary) handlePointerEvent(e); });
+          cnv.elt.addEventListener('pointermove',   e => { if (e.isPrimary) handlePointerEvent(e); });
+          cnv.elt.addEventListener('pointerdown',   e => {
+            if (e.isPrimary) {
+              // Set cursor position on initial contact without adding a path sample.
+              const rect = cnv.elt.getBoundingClientRect();
+              lastMX = e.clientX - rect.left;
+              lastMY = e.clientY - rect.top;
+              pointerInside = true;
+            }
+            spawnWave(e.clientX, e.clientY);
+          });
+          cnv.elt.addEventListener('pointerup',     e => { if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
         } else {
           // Fallback for older browsers.
           cnv.elt.addEventListener('mouseenter', e => updateFromClient(e.clientX, e.clientY));
