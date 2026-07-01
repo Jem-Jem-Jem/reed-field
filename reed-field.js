@@ -110,9 +110,9 @@ const ReedField = (() => {
         this.wvy = (this.wvy + wfy + wspY) * cfg.waveDamping;
         this.wdx += this.wvx;
         this.wdy += this.wvy;
-        // Dead-zone: snap to rest once energy is negligible, preventing residual
+        // Dead-zone: snap to rest once velocity is negligible, preventing residual
         // oscillation from bleeding into the cursor channel's visual.
-        if (Math.abs(this.wdx) + Math.abs(this.wdy) + Math.abs(this.wvx) + Math.abs(this.wvy) < 0.15) {
+        if (Math.abs(this.wvx) + Math.abs(this.wvy) < 0.15) {
           this.wdx = this.wdy = this.wvx = this.wvy = 0;
         }
 
@@ -230,10 +230,10 @@ const ReedField = (() => {
       tipColor:        '#faa61a',
       aspectRatio:     null,   // null = fill container height
       autoMobileScale: true,
-      waveSpeed:          12,   // px/frame wavefront expansion
+      waveSpeed:          6,    // px/frame wavefront expansion
       waveWidth:          8,    // crest half-wavelength in px
       waveStrength:       28,   // peak outward force at wavefront
-      waveMaxRadius:      800,  // wave dies beyond this radius
+      waveMaxRadius:      800,  // fallback cap; overridden per-canvas by diagonal reach unless set explicitly
       waveStiffness:      0.9,  // spring stiffness for wave channel (stiffer = faster snap-back)
       waveDamping:        0.35, // damping for wave channel (lower = faster decay)
       waveTroughStrength: 0.7,  // inward trough amplitude as fraction of crest (enables interference)
@@ -259,6 +259,7 @@ const ReedField = (() => {
       let Reed;
       let cnv;
       let waves         = [];       // active click waves
+      let waveMaxRadiusEff = cfg.waveMaxRadius; // recomputed to canvas diagonal in initSystem()
       const container   = document.getElementById(containerId);
 
       function canvasHeight() {
@@ -282,6 +283,12 @@ const ReedField = (() => {
         bgBuffer = buildBackground(p, cfg);
         parseColors();
         canvasRect = cnv.elt.getBoundingClientRect();
+        // Any spawn point is at most one canvas-diagonal from the farthest corner —
+        // sizing the cap to that guarantees a wave reaches every edge of the field
+        // regardless of container size, unless the user explicitly pinned a radius.
+        waveMaxRadiusEff = userConfig.waveMaxRadius === undefined
+          ? Math.hypot(p.width, p.height) + cfg.waveWidth
+          : cfg.waveMaxRadius;
         reeds = [];
         const aspect = p.width / p.height;
         const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
@@ -412,7 +419,7 @@ const ReedField = (() => {
         // Expand waves, prune dead ones.
         for (let i = waves.length - 1; i >= 0; i--) {
           waves[i].radius += cfg.waveSpeed;
-          if (waves[i].radius > cfg.waveMaxRadius) waves.splice(i, 1);
+          if (waves[i].radius > waveMaxRadiusEff) waves.splice(i, 1);
         }
 
         p.image(bgBuffer, 0, 0);
