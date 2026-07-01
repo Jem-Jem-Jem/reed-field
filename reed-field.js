@@ -23,6 +23,7 @@ const ReedField = (() => {
   function makeReedClass(p, cfg) {
     class Reed {
       static DOT_DIAM = 3;
+      static BASE_W   = 1.5;
       constructor(x, y) {
         this.bx = x;
         this.by = y;
@@ -40,7 +41,6 @@ const ReedField = (() => {
         this.wvx = 0;
         this.wvy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
-        this.baseW     = 1.5;
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
@@ -162,13 +162,11 @@ const ReedField = (() => {
         this.dx += this.vx;
         this.dy += this.vy;
       }
-      draw(baseCol, tipCol) {
-        // Base dot is always rendered so every reed is visible at rest.
-        // Uniform size across reeds, full reed color (no darkening).
-        p.fill(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
+      draw(r, g, b) {
+        // Base dot — always visible at rest.
+        p.fill(r, g, b, this.alpha);
         p.noStroke();
         p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
-        p.noFill();
 
         const sdx  = this.dx + this.wdx;
         const sdy  = this.dy + this.wdy;
@@ -180,9 +178,9 @@ const ReedField = (() => {
         // Tip resists the outward bend: blend the tip direction between the
         // raw displacement direction (nx, ny) and straight up (0, -1). The
         // result is the unit direction the tip points in.
-        const r    = this.tipResist;
-        let tdx    = nx * (1 - r);
-        let tdy    = ny * (1 - r) - r;
+        const tr   = this.tipResist;
+        let tdx    = nx * (1 - tr);
+        let tdy    = ny * (1 - tr) - tr;
         const tmag = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
         const tnx  = tdx / tmag;
         const tny  = tdy / tmag;
@@ -201,34 +199,18 @@ const ReedField = (() => {
         const p1y = byy - baseLen;
         const p2x = p3x - tnx * tipLen;
         const p2y = p3y - tny * tipLen;
-        p.stroke(p.red(baseCol), p.green(baseCol), p.blue(baseCol), this.alpha);
-        p.strokeWeight(this.baseW);
-        const segs = 5;
-        let px = bxx, py = byy;
-        for (let i = 1; i <= segs; i++) {
-          const t1 = i / segs;
-          const u  = 1 - t1;
-          const u2 = u * u;
-          const u3 = u2 * u;
-          const t2 = t1 * t1;
-          const t3 = t2 * t1;
-          const x1 = u3 * bxx + 3 * u2 * t1 * p1x + 3 * u * t2 * p2x + t3 * p3x;
-          const y1 = u3 * byy + 3 * u2 * t1 * p1y + 3 * u * t2 * p2y + t3 * p3y;
-          p.line(px, py, x1, y1);
-          px = x1; py = y1;
-        }
+        p.stroke(r, g, b, this.alpha);
+        p.noFill();
+        p.bezier(bxx, byy, p1x, p1y, p2x, p2y, p3x, p3y);
       }
     }
     return Reed;
   }
 
   function buildBackground(p, cfg) {
-    const g    = p.createGraphics(p.width, p.height);
-    const bgR  = parseInt(cfg.bgColor.slice(1, 3), 16);
-    const bgG  = parseInt(cfg.bgColor.slice(3, 5), 16);
-    const bgBl = parseInt(cfg.bgColor.slice(5, 7), 16);
+    const g = p.createGraphics(p.width, p.height);
     g.noStroke();
-    g.background(bgR, bgG, bgBl);
+    g.background(cfg.bgColor);
     return g;
   }
 
@@ -266,6 +248,8 @@ const ReedField = (() => {
       let reeds         = [];
       let bgBuffer      = null;
       let baseCol, tipCol;
+      let baseR = 0, baseG = 0, baseB = 0;
+      let canvasRect    = null;
       let pointerInside = false;
       let lastMX        = -99999;
       let lastMY        = -99999;
@@ -284,16 +268,11 @@ const ReedField = (() => {
       }
 
       function parseColors() {
-        baseCol = p.color(
-          parseInt(cfg.baseColor.slice(1,3),16),
-          parseInt(cfg.baseColor.slice(3,5),16),
-          parseInt(cfg.baseColor.slice(5,7),16)
-        );
-        tipCol = p.color(
-          parseInt(cfg.tipColor.slice(1,3),16),
-          parseInt(cfg.tipColor.slice(3,5),16),
-          parseInt(cfg.tipColor.slice(5,7),16)
-        );
+        baseCol = p.color(cfg.baseColor);
+        tipCol  = p.color(cfg.tipColor);
+        baseR   = p.red(baseCol);
+        baseG   = p.green(baseCol);
+        baseB   = p.blue(baseCol);
       }
 
       function initSystem() {
@@ -302,6 +281,7 @@ const ReedField = (() => {
         Reed     = makeReedClass(p, cfg);
         bgBuffer = buildBackground(p, cfg);
         parseColors();
+        canvasRect = cnv.elt.getBoundingClientRect();
         reeds = [];
         const aspect = p.width / p.height;
         const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
@@ -319,9 +299,8 @@ const ReedField = (() => {
 
       function updateFromClient(clientX, clientY) {
         if (clientX == null || clientY == null) return;
-        const rect = cnv.elt.getBoundingClientRect();
-        lastMX = clientX - rect.left;
-        lastMY = clientY - rect.top;
+        lastMX = clientX - canvasRect.left;
+        lastMY = clientY - canvasRect.top;
         pointerInside = true;
         if (pathBuf.length >= PATH_CAP) pathBuf.shift();
         pathBuf.push([lastMX, lastMY]);
@@ -347,8 +326,7 @@ const ReedField = (() => {
       }
 
       function spawnWave(clientX, clientY) {
-        const rect = cnv.elt.getBoundingClientRect();
-        waves.push({ cx: clientX - rect.left, cy: clientY - rect.top, radius: 0, strength: cfg.waveStrength });
+        waves.push({ cx: clientX - canvasRect.left, cy: clientY - canvasRect.top, radius: 0, strength: cfg.waveStrength });
       }
 
       p.setup = () => {
@@ -372,9 +350,8 @@ const ReedField = (() => {
           cnv.elt.addEventListener('pointerdown',   e => {
             if (e.isPrimary) {
               // Set cursor position on initial contact without adding a path sample.
-              const rect = cnv.elt.getBoundingClientRect();
-              lastMX = e.clientX - rect.left;
-              lastMY = e.clientY - rect.top;
+              lastMX = e.clientX - canvasRect.left;
+              lastMY = e.clientY - canvasRect.top;
               pointerInside = true;
             }
             spawnWave(e.clientX, e.clientY);
@@ -440,9 +417,10 @@ const ReedField = (() => {
 
         p.image(bgBuffer, 0, 0);
 
+        p.strokeWeight(Reed.BASE_W);
         for (const reed of reeds) {
           reed.update(framePath, t, cfg, waves);
-          reed.draw(baseCol, tipCol);
+          reed.draw(baseR, baseG, baseB);
         }
 
         if (pointerInside && lastMX > 0 && lastMX < p.width && lastMY > 0 && lastMY < p.height) {
