@@ -60,8 +60,6 @@ Visual knobs live in the `ReedField.init` call inside `index.html`:
 ```js
 ReedField.init('reed-hero', {
   reedCount: 2000,
-  influenceRadiusCursor: 16,
-  influenceRadiusTouch: 28,
   reedLengthMin: 8,
   reedLengthMax: 10,
   swayStrength: 0,
@@ -75,11 +73,15 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `seed`            | `42`        | RNG seed — change for a different reed layout             |
 | `reedCount`       | `1300`      | How many reeds to place across the canvas                 |
 | `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
-| `influenceRadiusCursor` | `16`  | Radius (px) around a mouse/pen cursor that bends reeds    |
-| `influenceRadiusTouch`  | `28`  | Radius (px) around a touch point that bends reeds         |
-| `forceStrength`   | `14`        | How hard the cursor pushes reeds inside that radius       |
 | `stiffness`       | `0.02`      | Spring pull back to rest pose (lower = looser)            |
 | `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
+| `moveGridCell`    | `14`        | Heightfield cell size (px) for the movement-ripple sim    |
+| `moveGridDamping` | `0.985`     | Grid wave-equation decay per frame                        |
+| `moveInjectStrength` | `1.4`    | Ripple dip strength per px of mouse/pen movement          |
+| `moveInjectStrengthTouch` | `2.2` | Ripple dip strength per px of touch movement          |
+| `moveForceScale`  | `0.6`       | Grid gradient → reed push force conversion                |
+| `moveStiffness`   | `0.9`       | Spring stiffness of the movement-ripple reed channel       |
+| `moveDamping`     | `0.35`      | Damping of the movement-ripple reed channel                |
 | `reedLengthMin`   | `18`        | Minimum per-reed render length                            |
 | `reedLengthMax`   | `42`        | Maximum per-reed render length                            |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
@@ -96,6 +98,15 @@ samples the browser buffered are preserved), with the previous frame's last
 sample carried forward so segments span frame boundaries. Each reed checks
 its point-to-segment distance to the nearest segment, which means fast cursor
 motion doesn't skip over reeds even when the host page is dropping frames.
+
+Movement doesn't push nearby reeds directly. Instead each moved-through point
+injects a dip into a shared heightfield grid, which propagates as a real 2D
+wave equation (Coding Train "2D Water Ripples" pattern) — reeds are pushed
+along the local surface gradient. Dragging continuously reads as a trailing
+wake because earlier ripples are still expanding and decaying while new ones
+spawn; the shape is never hand-authored, it falls out of wave interference.
+Click/tap waves are a separate, unrelated system (`waveSpeed`/`waveStrength`/etc.)
+that still expand as discrete rings.
 
 ## License
 
