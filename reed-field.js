@@ -242,8 +242,8 @@ const ReedField = (() => {
       moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
       moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
       moveForceScale:      0.35, // grid gradient -> reed force conversion
-      moveStiffness:       0.9,  // spring stiffness for movement-ripple reed channel
-      moveDamping:         0.35, // damping for movement-ripple reed channel
+      moveStiffness:       0.55, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
+      moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
     // Auto-tune for small/touch screens (only if user didn't override)

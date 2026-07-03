@@ -82,8 +82,8 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `moveInjectStrength` | `0.5`    | Ripple dip strength per px of mouse/pen movement          |
 | `moveInjectStrengthTouch` | `0.75` | Ripple dip strength per px of touch movement          |
 | `moveForceScale`  | `0.35`      | Grid gradient → reed push force conversion                |
-| `moveStiffness`   | `0.9`       | Spring stiffness of the movement-ripple reed channel       |
-| `moveDamping`     | `0.35`      | Damping of the movement-ripple reed channel                |
+| `moveStiffness`   | `0.55`      | Spring stiffness of the movement-ripple reed channel (lower = slower pull back) |
+| `moveDamping`     | `0.5`       | Damping of the movement-ripple reed channel (higher = lingers longer) |
 | `reedLengthMin`   | `22`        | Minimum per-reed render length                            |
 | `reedLengthMax`   | `48`        | Maximum per-reed render length                            |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
