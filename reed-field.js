@@ -225,7 +225,6 @@ const ReedField = (() => {
       reedLengthMax:   48,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
-      tipColor:        '#faa61a',
       aspectRatio:     null,   // null = fill container height
       autoMobileScale: true,
       waveSpeed:          6,    // px/frame wavefront expansion
@@ -254,7 +253,7 @@ const ReedField = (() => {
     new p5(p => {
       let reeds         = [];
       let bgBuffer      = null;
-      let baseCol, tipCol;
+      let baseCol;
       let baseR = 0, baseG = 0, baseB = 0;
       let canvasRect    = null;
       let pointerInside = false;
@@ -320,7 +319,6 @@ const ReedField = (() => {
 
       function parseColors() {
         baseCol = p.color(cfg.baseColor);
-        tipCol  = p.color(cfg.tipColor);
         baseR   = p.red(baseCol);
         baseG   = p.green(baseCol);
         baseB   = p.blue(baseCol);

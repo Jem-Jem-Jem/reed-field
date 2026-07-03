@@ -75,6 +75,13 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
 | `stiffness`       | `0.02`      | Spring pull back to rest pose (lower = looser)            |
 | `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
+| `waveSpeed`       | `6`         | Click/tap wave expansion speed (px/frame)                 |
+| `waveWidth`       | `8`         | Click/tap wave crest half-wavelength (px)                 |
+| `waveStrength`    | `28`        | Click/tap wave peak outward force at the wavefront         |
+| `waveMaxRadius`   | `800`       | Fallback cap; auto-set to canvas diagonal unless overridden |
+| `waveStiffness`   | `0.9`       | Spring stiffness of the click-wave reed channel            |
+| `waveDamping`     | `0.35`      | Damping of the click-wave reed channel                      |
+| `waveTroughStrength` | `0.7`    | Inward trough amplitude as a fraction of crest (wave interference) |
 | `moveGridCell`    | `14`        | Heightfield cell size (px) for the movement-ripple sim    |
 | `moveGridDamping` | `0.96`      | Grid wave-equation decay per frame                        |
 | `moveEdgeSpongeWidth` | `6`     | Cells near each wall with extra damping (absorbs before reflecting) |
@@ -87,8 +94,7 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `reedLengthMin`   | `22`        | Minimum per-reed render length                            |
 | `reedLengthMax`   | `48`        | Maximum per-reed render length                            |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
-| `baseColor`       | `#faa61a`   | Color at the reed's root                                  |
-| `tipColor`        | `#faa61a`   | Color at the reed's tip                                   |
+| `baseColor`       | `#faa61a`   | Reed color (root and tip draw in the same color)           |
 | `aspectRatio`     | `null`      | If set, canvas height = width × ratio; otherwise fills    |
 | `autoMobileScale` | `true`      | Auto-drop reedCount on narrow viewports (only if unset)   |
 
@@ -97,9 +103,10 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 The cursor isn't sampled as a single point per frame — it's tracked as a short
 polyline built from `PointerEvent.getCoalescedEvents()` (so the sub-frame
 samples the browser buffered are preserved), with the previous frame's last
-sample carried forward so segments span frame boundaries. Each reed checks
-its point-to-segment distance to the nearest segment, which means fast cursor
-motion doesn't skip over reeds even when the host page is dropping frames.
+sample carried forward so segments span frame boundaries. This matters
+because every segment in that polyline injects into the ripple grid (see
+below), so fast cursor motion still disturbs every cell it crossed even when
+the host page is dropping frames — not just the endpoint.
 
 Movement doesn't push nearby reeds directly. Instead each moved-through point
 injects a dip into a shared heightfield grid, which propagates as a real 2D
