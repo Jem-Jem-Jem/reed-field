@@ -417,14 +417,9 @@ const ReedField = (() => {
               lastMY = e.clientY - canvasRect.top;
               pointerInside = true;
             }
-            // Touch fires the radial wave on release (see pointerup) so contact
-            // doesn't stomp the movement-ripple wake; mouse/pen fire immediately.
-            if (e.pointerType !== 'touch') spawnWave(e.clientX, e.clientY);
+            spawnWave(e.clientX, e.clientY);
           });
-          cnv.elt.addEventListener('pointerup',     e => {
-            if (e.pointerType === 'touch') spawnWave(e.clientX, e.clientY);
-            if (e.isPrimary) resetPointer();
-          });
+          cnv.elt.addEventListener('pointerup',     e => { if (e.isPrimary) resetPointer(); });
           cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
           cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
         } else {
@@ -436,6 +431,7 @@ const ReedField = (() => {
           cnv.elt.addEventListener('touchstart', e => {
             lastPointerType = 'touch';
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
+            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
             e.preventDefault();
           }, { passive: false });
           cnv.elt.addEventListener('touchmove', e => {
@@ -443,10 +439,7 @@ const ReedField = (() => {
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             e.preventDefault();
           }, { passive: false });
-          cnv.elt.addEventListener('touchend', e => {
-            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
-            resetPointer();
-          });
+          cnv.elt.addEventListener('touchend', resetPointer);
         }
 
         initSystem();
