@@ -232,10 +232,12 @@ const ReedField = (() => {
       waveDamping:        0.35, // damping for wave channel (lower = faster decay)
       waveTroughStrength: 0.7,  // inward trough amplitude as fraction of crest (enables interference)
       moveGridCell:        14,   // heightfield cell size in px
-      moveGridDamping:   0.985,  // grid propagation decay per frame (wave-equation channel)
-      moveInjectStrength:  1.4,  // dip strength per px of mouse/pen movement
-      moveInjectStrengthTouch: 2.2, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
-      moveForceScale:      0.6,  // grid gradient -> reed force conversion
+      moveGridDamping:     0.96, // grid propagation decay per frame (wave-equation channel)
+      moveEdgeSpongeWidth:   6,  // cells near each wall that get extra damping (absorbs before reflecting)
+      moveEdgeDamping:     0.75, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth)
+      moveInjectStrength:  0.35, // dip strength per px of mouse/pen movement
+      moveInjectStrengthTouch: 0.55, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
+      moveForceScale:      0.25, // grid gradient -> reed force conversion
       moveStiffness:       0.9,  // spring stiffness for movement-ripple reed channel
       moveDamping:         0.35, // damping for movement-ripple reed channel
     }, userConfig);
@@ -266,7 +268,20 @@ const ReedField = (() => {
       // Independent of reed grid — sized off canvas px, not reedCount.
       let gridCols = 0, gridRows = 0;
       let hCurr = null, hPrev = null;
+      let spongeMask = null; // extra per-cell damping near edges — absorbs energy before it hits the hard wall
       const gridIdx = (gx, gy) => (gy + 1) * (gridCols + 2) + (gx + 1);
+      function buildSponge() {
+        spongeMask = new Float32Array((gridCols + 2) * (gridRows + 2)).fill(1);
+        const w = cfg.moveEdgeSpongeWidth;
+        for (let gy = 0; gy < gridRows; gy++) {
+          for (let gx = 0; gx < gridCols; gx++) {
+            const distToEdge = Math.min(gx, gy, gridCols - 1 - gx, gridRows - 1 - gy);
+            spongeMask[gridIdx(gx, gy)] = distToEdge >= w
+              ? 1
+              : cfg.moveEdgeDamping + (1 - cfg.moveEdgeDamping) * (distToEdge / w);
+          }
+        }
+      }
       function injectRipple(x, y, strength) {
         const gxf = x / cfg.moveGridCell, gyf = y / cfg.moveGridCell;
         const ix = Math.floor(gxf), iy = Math.floor(gyf);
@@ -286,7 +301,7 @@ const ReedField = (() => {
             const i = gridIdx(gx, gy);
             const neighbors = hCurr[gridIdx(gx - 1, gy)] + hCurr[gridIdx(gx + 1, gy)]
                              + hCurr[gridIdx(gx, gy - 1)] + hCurr[gridIdx(gx, gy + 1)];
-            hPrev[i] = (neighbors * 0.5 - hPrev[i]) * cfg.moveGridDamping;
+            hPrev[i] = (neighbors * 0.5 - hPrev[i]) * cfg.moveGridDamping * spongeMask[i];
           }
         }
         const tmp = hPrev; hPrev = hCurr; hCurr = tmp;
@@ -325,6 +340,7 @@ const ReedField = (() => {
         const gridSize = (gridCols + 2) * (gridRows + 2);
         hCurr = new Float32Array(gridSize);
         hPrev = new Float32Array(gridSize);
+        buildSponge();
         reeds = [];
         const aspect = p.width / p.height;
         const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
