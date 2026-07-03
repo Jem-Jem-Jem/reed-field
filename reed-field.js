@@ -388,9 +388,6 @@ const ReedField = (() => {
       }
 
       function spawnWave(clientX, clientY) {
-        if (window.__reedFieldDebugLog) {
-          window.__reedFieldDebugLog(`${(performance.now() / 1000).toFixed(2)}s >>> spawnWave`);
-        }
         waves.push({ cx: clientX - canvasRect.left, cy: clientY - canvasRect.top, radius: 0, strength: cfg.waveStrength });
       }
 
@@ -406,53 +403,13 @@ const ReedField = (() => {
         cnv.elt.style.cursor     = 'crosshair';
         cnv.elt.style.touchAction = 'none';
 
-        // On-screen debug overlay for in-app browsers (e.g. Figma Sites'
-        // embedded viewer) where devtools/remote inspect isn't available.
-        // Enable with ?debug=1 (or #debug) on the page URL.
-        let debugLog = null;
-        if (/[?&#]debug(=1)?\b/.test(location.href)) {
-          alert('debug branch entered\nhref=' + location.href); // TEMP diagnostic — remove after triage
-          debugLog = document.createElement('div');
-          // min-height + non-empty initial text so the bar is visibly present
-          // even before any event fires; safe-area padding keeps it clear of
-          // iOS Safari's bottom toolbar/home-indicator overlap.
-          debugLog.style.cssText = 'position:fixed;bottom:0;left:0;right:0;min-height:2.4em;max-height:40vh;'
-            + 'overflow-y:auto;background:rgba(0,20,0,0.92);color:#0f0;font:11px/1.4 monospace;'
-            + 'padding:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom));'
-            + 'border-top:2px solid #0f0;z-index:2147483647;white-space:pre-wrap;pointer-events:none;';
-          debugLog.textContent = 'DEBUG MODE ON — waiting for events...';
-          document.body.appendChild(debugLog);
-          const lines = [];
-          window.__reedFieldDebugLog = (msg) => {
-            lines.push(msg);
-            if (lines.length > 40) lines.shift();
-            debugLog.textContent = lines.join('\n');
-          };
-        }
-        const dbg = (label, e) => {
-          if (!debugLog) return;
-          window.__reedFieldDebugLog(
-            `${(performance.now() / 1000).toFixed(2)}s ${label} `
-            + `type=${e.pointerType || 'n/a'} isPrimary=${e.isPrimary} `
-            + `x=${Math.round(e.clientX)},${Math.round(e.clientY)}`
-          );
-        };
-        const dbgTouch = (label, e) => {
-          if (!debugLog) return;
-          window.__reedFieldDebugLog(
-            `${(performance.now() / 1000).toFixed(2)}s ${label} `
-            + `touches=${e.touches.length} changed=${e.changedTouches.length}`
-          );
-        };
-
         // Pointer events cover mouse, pen and touch in one place.
         if (window.PointerEvent) {
           // Cursor tracking is primary-pointer only and path samples only on move,
           // so secondary touches don't inject line segments between touch points.
-          cnv.elt.addEventListener('pointerenter',  e => { dbg('pointerenter', e); if (e.isPrimary) handlePointerEvent(e); });
+          cnv.elt.addEventListener('pointerenter',  e => { if (e.isPrimary) handlePointerEvent(e); });
           cnv.elt.addEventListener('pointermove',   e => { if (e.isPrimary) handlePointerEvent(e); });
           cnv.elt.addEventListener('pointerdown',   e => {
-            dbg('pointerdown', e);
             if (e.isPrimary) {
               lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
               // Set cursor position on initial contact without adding a path sample.
@@ -462,9 +419,9 @@ const ReedField = (() => {
             }
             spawnWave(e.clientX, e.clientY);
           });
-          cnv.elt.addEventListener('pointerup',     e => { dbg('pointerup', e); if (e.isPrimary) resetPointer(); });
-          cnv.elt.addEventListener('pointerleave',  e => { dbg('pointerleave', e); if (e.isPrimary) resetPointer(); });
-          cnv.elt.addEventListener('pointercancel', e => { dbg('pointercancel', e); if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointerup',     e => { if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
         } else {
           // Fallback for older browsers.
           cnv.elt.addEventListener('mouseenter', e => { lastPointerType = 'mouse'; updateFromClient(e.clientX, e.clientY); });
@@ -472,7 +429,6 @@ const ReedField = (() => {
           cnv.elt.addEventListener('mouseleave', resetPointer);
           cnv.elt.addEventListener('mousedown',  e => spawnWave(e.clientX, e.clientY));
           cnv.elt.addEventListener('touchstart', e => {
-            dbgTouch('touchstart', e);
             lastPointerType = 'touch';
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
@@ -483,7 +439,7 @@ const ReedField = (() => {
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             e.preventDefault();
           }, { passive: false });
-          cnv.elt.addEventListener('touchend', e => { dbgTouch('touchend', e); resetPointer(); });
+          cnv.elt.addEventListener('touchend', resetPointer);
         }
 
         initSystem();
