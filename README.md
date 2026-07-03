@@ -78,14 +78,14 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `moveGridCell`    | `14`        | Heightfield cell size (px) for the movement-ripple sim    |
 | `moveGridDamping` | `0.96`      | Grid wave-equation decay per frame                        |
 | `moveEdgeSpongeWidth` | `6`     | Cells near each wall with extra damping (absorbs before reflecting) |
-| `moveEdgeDamping` | `0.75`      | Damping multiplier at the very edge (ramps to 1.0 over spongeWidth) |
+| `moveEdgeDamping` | `0.87`      | Damping multiplier at the very edge (ramps to 1.0 over spongeWidth) |
 | `moveInjectStrength` | `0.5`    | Ripple dip strength per px of mouse/pen movement          |
 | `moveInjectStrengthTouch` | `0.75` | Ripple dip strength per px of touch movement          |
 | `moveForceScale`  | `0.35`      | Grid gradient → reed push force conversion                |
 | `moveStiffness`   | `0.9`       | Spring stiffness of the movement-ripple reed channel       |
 | `moveDamping`     | `0.35`      | Damping of the movement-ripple reed channel                |
-| `reedLengthMin`   | `18`        | Minimum per-reed render length                            |
-| `reedLengthMax`   | `42`        | Maximum per-reed render length                            |
+| `reedLengthMin`   | `22`        | Minimum per-reed render length                            |
+| `reedLengthMax`   | `48`        | Maximum per-reed render length                            |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
 | `baseColor`       | `#faa61a`   | Color at the reed's root                                  |
 | `tipColor`        | `#faa61a`   | Color at the reed's tip                                   |

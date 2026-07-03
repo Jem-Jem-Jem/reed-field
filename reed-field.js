@@ -144,7 +144,11 @@ const ReedField = (() => {
         this.mvy = (this.mvy + fmy + mspY) * cfg.moveDamping;
         this.mwx += this.mvx;
         this.mwy += this.mvy;
-        if (Math.abs(this.mvx) + Math.abs(this.mvy) < 0.02) {
+        // Dead-zone only once the driving force itself is gone — a slow drag's
+        // gradient force is legitimately smaller than 0.02 per frame, so gating
+        // on velocity alone was snapping it to zero before it could accumulate.
+        if (Math.abs(fmx) + Math.abs(fmy) < 0.0005
+            && Math.abs(this.mvx) + Math.abs(this.mvy) < 0.02) {
           this.mwx = this.mwy = this.mvx = this.mvy = 0;
         }
 
@@ -217,8 +221,8 @@ const ReedField = (() => {
       swayStrength:    2.5,
       stiffness:       0.05,
       damping:         0.82,
-      reedLengthMin:   18,
-      reedLengthMax:   42,
+      reedLengthMin:   22,
+      reedLengthMax:   48,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
       tipColor:        '#faa61a',
@@ -234,7 +238,7 @@ const ReedField = (() => {
       moveGridCell:        14,   // heightfield cell size in px
       moveGridDamping:     0.96, // grid propagation decay per frame (wave-equation channel)
       moveEdgeSpongeWidth:   6,  // cells near each wall that get extra damping (absorbs before reflecting)
-      moveEdgeDamping:     0.75, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth)
+      moveEdgeDamping:     0.87, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth) — loose enough to let a bounce through, still killed fast by moveGridDamping after
       moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
       moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
       moveForceScale:      0.35, // grid gradient -> reed force conversion
