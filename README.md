@@ -79,9 +79,9 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `moveGridDamping` | `0.96`      | Grid wave-equation decay per frame                        |
 | `moveEdgeSpongeWidth` | `6`     | Cells near each wall with extra damping (absorbs before reflecting) |
 | `moveEdgeDamping` | `0.75`      | Damping multiplier at the very edge (ramps to 1.0 over spongeWidth) |
-| `moveInjectStrength` | `0.35`   | Ripple dip strength per px of mouse/pen movement          |
-| `moveInjectStrengthTouch` | `0.55` | Ripple dip strength per px of touch movement          |
-| `moveForceScale`  | `0.25`      | Grid gradient → reed push force conversion                |
+| `moveInjectStrength` | `0.5`    | Ripple dip strength per px of mouse/pen movement          |
+| `moveInjectStrengthTouch` | `0.75` | Ripple dip strength per px of touch movement          |
+| `moveForceScale`  | `0.35`      | Grid gradient → reed push force conversion                |
 | `moveStiffness`   | `0.9`       | Spring stiffness of the movement-ripple reed channel       |
 | `moveDamping`     | `0.35`      | Damping of the movement-ripple reed channel                |
 | `reedLengthMin`   | `18`        | Minimum per-reed render length                            |

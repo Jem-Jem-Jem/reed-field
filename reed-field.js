@@ -235,9 +235,9 @@ const ReedField = (() => {
       moveGridDamping:     0.96, // grid propagation decay per frame (wave-equation channel)
       moveEdgeSpongeWidth:   6,  // cells near each wall that get extra damping (absorbs before reflecting)
       moveEdgeDamping:     0.75, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth)
-      moveInjectStrength:  0.35, // dip strength per px of mouse/pen movement
-      moveInjectStrengthTouch: 0.55, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
-      moveForceScale:      0.25, // grid gradient -> reed force conversion
+      moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
+      moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
+      moveForceScale:      0.35, // grid gradient -> reed force conversion
       moveStiffness:       0.9,  // spring stiffness for movement-ripple reed channel
       moveDamping:         0.35, // damping for movement-ripple reed channel
     }, userConfig);
