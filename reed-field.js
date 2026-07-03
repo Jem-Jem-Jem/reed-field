@@ -23,7 +23,7 @@ const ReedField = (() => {
   function makeReedClass(p, cfg) {
     class Reed {
       static DOT_DIAM = 3;
-      static BASE_W   = 1.5;
+      static BASE_W   = 2.5;
       constructor(x, y) {
         this.bx = x;
         this.by = y;
@@ -231,7 +231,7 @@ const ReedField = (() => {
       waveWidth:          8,    // crest half-wavelength in px
       waveStrength:       28,   // peak outward force at wavefront
       waveMaxRadius:      800,  // fallback cap; overridden per-canvas by diagonal reach unless set explicitly
-      waveStiffness:      0.9,  // spring stiffness for wave channel (stiffer = faster snap-back)
+      waveStiffness:      0.6,  // spring stiffness for wave channel (stiffer = faster snap-back)
       waveDamping:        0.35, // damping for wave channel (lower = faster decay)
       waveTroughStrength: 0.7,  // inward trough amplitude as fraction of crest (enables interference)
       moveGridCell:        14,   // heightfield cell size in px
@@ -241,7 +241,7 @@ const ReedField = (() => {
       moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
       moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
       moveForceScale:      0.35, // grid gradient -> reed force conversion
-      moveStiffness:       0.55, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
+      moveStiffness:       0.35, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
@@ -285,14 +285,18 @@ const ReedField = (() => {
           }
         }
       }
+      // 3x3 tent kernel (sums to 1) — spreads the dip past a single grid cell so a
+      // slow drag's small per-frame strength still reaches a reed's sample point
+      // before it dissipates, instead of a 2x2 bilinear splat that stayed too
+      // tightly pinned to the cursor's exact sub-cell position.
+      const INJECT_KERNEL = [
+        [-1, -1, 0.05], [0, -1, 0.1], [1, -1, 0.05],
+        [-1,  0, 0.1 ], [0,  0, 0.4 ], [1,  0, 0.1 ],
+        [-1,  1, 0.05], [0,  1, 0.1], [1,  1, 0.05],
+      ];
       function injectRipple(x, y, strength) {
-        const gxf = x / cfg.moveGridCell, gyf = y / cfg.moveGridCell;
-        const ix = Math.floor(gxf), iy = Math.floor(gyf);
-        const fx = gxf - ix, fy = gyf - iy;
-        addCell(ix,     iy,     strength * (1 - fx) * (1 - fy));
-        addCell(ix + 1, iy,     strength * fx       * (1 - fy));
-        addCell(ix,     iy + 1, strength * (1 - fx) * fy);
-        addCell(ix + 1, iy + 1, strength * fx       * fy);
+        const ix = Math.round(x / cfg.moveGridCell), iy = Math.round(y / cfg.moveGridCell);
+        for (const [dx, dy, w] of INJECT_KERNEL) addCell(ix + dx, iy + dy, strength * w);
       }
       function addCell(gx, gy, v) {
         if (gx < 0 || gx >= gridCols || gy < 0 || gy >= gridRows) return;
@@ -417,9 +421,14 @@ const ReedField = (() => {
               lastMY = e.clientY - canvasRect.top;
               pointerInside = true;
             }
-            spawnWave(e.clientX, e.clientY);
+            // Touch spawns its wave on release, not contact, so a tap doesn't
+            // stomp the movement-ripple wake before the finger even moves.
+            if (e.pointerType !== 'touch') spawnWave(e.clientX, e.clientY);
           });
-          cnv.elt.addEventListener('pointerup',     e => { if (e.isPrimary) resetPointer(); });
+          cnv.elt.addEventListener('pointerup',     e => {
+            if (e.pointerType === 'touch') spawnWave(e.clientX, e.clientY);
+            if (e.isPrimary) resetPointer();
+          });
           cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
           cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
         } else {
@@ -431,7 +440,6 @@ const ReedField = (() => {
           cnv.elt.addEventListener('touchstart', e => {
             lastPointerType = 'touch';
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
-            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
             e.preventDefault();
           }, { passive: false });
           cnv.elt.addEventListener('touchmove', e => {
@@ -439,7 +447,11 @@ const ReedField = (() => {
             const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
             e.preventDefault();
           }, { passive: false });
-          cnv.elt.addEventListener('touchend', resetPointer);
+          cnv.elt.addEventListener('touchend', e => {
+            // Touch spawns its wave on release, not contact — see pointerdown/up above.
+            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
+            resetPointer();
+          });
         }
 
         initSystem();
