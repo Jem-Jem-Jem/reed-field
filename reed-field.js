@@ -411,10 +411,16 @@ const ReedField = (() => {
         // Enable with ?debug=1 (or #debug) on the page URL.
         let debugLog = null;
         if (/[?&#]debug(=1)?\b/.test(location.href)) {
+          alert('debug branch entered\nhref=' + location.href); // TEMP diagnostic — remove after triage
           debugLog = document.createElement('div');
-          debugLog.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;'
-            + 'overflow-y:auto;background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.4 monospace;'
-            + 'padding:6px;z-index:99999;white-space:pre-wrap;pointer-events:none;';
+          // min-height + non-empty initial text so the bar is visibly present
+          // even before any event fires; safe-area padding keeps it clear of
+          // iOS Safari's bottom toolbar/home-indicator overlap.
+          debugLog.style.cssText = 'position:fixed;bottom:0;left:0;right:0;min-height:2.4em;max-height:40vh;'
+            + 'overflow-y:auto;background:rgba(0,20,0,0.92);color:#0f0;font:11px/1.4 monospace;'
+            + 'padding:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom));'
+            + 'border-top:2px solid #0f0;z-index:2147483647;white-space:pre-wrap;pointer-events:none;';
+          debugLog.textContent = 'DEBUG MODE ON — waiting for events...';
           document.body.appendChild(debugLog);
           const lines = [];
           window.__reedFieldDebugLog = (msg) => {
