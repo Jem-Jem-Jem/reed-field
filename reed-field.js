@@ -40,6 +40,11 @@ const ReedField = (() => {
         this.wdy = 0;
         this.wvx = 0;
         this.wvy = 0;
+        // Separate channel for movement-ripple displacement (grid heightfield gradient).
+        this.mwx = 0;
+        this.mwy = 0;
+        this.mvx = 0;
+        this.mvy = 0;
         this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
@@ -61,7 +66,7 @@ const ReedField = (() => {
         this.colorVar  = rnd();
         this.alpha     = rndRange(140, 230);
       }
-      update(path, t, cfg, waves, infR) {
+      update(t, cfg, waves, field) {
         const sw    = cfg.swayStrength;
         const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
         const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
@@ -116,49 +121,44 @@ const ReedField = (() => {
           this.wdx = this.wdy = this.wvx = this.wvy = 0;
         }
 
-        // Cursor / sway channel — original settings unchanged.
-        let forceX = 0, forceY = 0;
-        if (path && path.length > 0) {
-          let minD2 = Infinity, minCx = 0, minCy = 0;
-          if (path.length === 1) {
-            minCx = this.bx - path[0][0];
-            minCy = this.by - path[0][1];
-            minD2 = minCx * minCx + minCy * minCy;
-          } else {
-            for (let i = 0; i < path.length - 1; i++) {
-              const ax = path[i][0],   ay = path[i][1];
-              const bx = path[i+1][0], by = path[i+1][1];
-              const dxs = bx - ax, dys = by - ay;
-              const lenSq = dxs * dxs + dys * dys;
-              let qx, qy;
-              if (lenSq < 0.0001) {
-                qx = ax; qy = ay;
-              } else {
-                let u = ((this.bx - ax) * dxs + (this.by - ay) * dys) / lenSq;
-                if (u < 0) u = 0; else if (u > 1) u = 1;
-                qx = ax + u * dxs;
-                qy = ay + u * dys;
-              }
-              const cx = this.bx - qx, cy = this.by - qy;
-              const d2 = cx * cx + cy * cy;
-              if (d2 < minD2) { minD2 = d2; minCx = cx; minCy = cy; }
-            }
-          }
-          const r2 = infR * infR;
-          if (minD2 < r2 && minD2 > 0.25) {
-            const dist = Math.sqrt(minD2);
-            const t1 = 1.0 - dist / infR;
-            const fm = t1 * t1 * cfg.forceStrength;
-            forceX = (minCx / dist) * fm;
-            forceY = (minCy / dist) * fm;
-          }
+        // Movement-ripple channel — force from the local gradient of the shared
+        // heightfield (grid injected by cursor/touch movement in p.draw(),
+        // propagated as a real 2D wave equation). Reeds are pushed downhill,
+        // same intuition as a floating particle on a disturbed water surface —
+        // wake shape is emergent from wave interference, not hand-authored.
+        let fmx = 0, fmy = 0;
+        if (field) {
+          const { hCurr, gridCols, gridRows, gridCell, idx } = field;
+          const gx = Math.max(0, Math.min(gridCols - 1, Math.round(this.bx / gridCell)));
+          const gy = Math.max(0, Math.min(gridRows - 1, Math.round(this.by / gridCell)));
+          const l = hCurr[idx(gx - 1, gy)];
+          const r = hCurr[idx(gx + 1, gy)];
+          const u = hCurr[idx(gx, gy - 1)];
+          const d = hCurr[idx(gx, gy + 1)];
+          fmx = (l - r) * cfg.moveForceScale;
+          fmy = (u - d) * cfg.moveForceScale;
         }
+        const mspX = -this.mwx * cfg.moveStiffness;
+        const mspY = -this.mwy * cfg.moveStiffness;
+        this.mvx = (this.mvx + fmx + mspX) * cfg.moveDamping;
+        this.mvy = (this.mvy + fmy + mspY) * cfg.moveDamping;
+        this.mwx += this.mvx;
+        this.mwy += this.mvy;
+        // Dead-zone only once the driving force itself is gone — a slow drag's
+        // gradient force is legitimately smaller than 0.02 per frame, so gating
+        // on velocity alone was snapping it to zero before it could accumulate.
+        if (Math.abs(fmx) + Math.abs(fmy) < 0.0005
+            && Math.abs(this.mvx) + Math.abs(this.mvy) < 0.02) {
+          this.mwx = this.mwy = this.mvx = this.mvy = 0;
+        }
+
+        // Sway channel — original settings unchanged.
         const tDx = this.restDx + swayX;
         const tDy = this.restDy + swayY;
         const spX = (tDx - this.dx) * cfg.stiffness;
         const spY = (tDy - this.dy) * cfg.stiffness;
-        this.vx = (this.vx + forceX + spX) * cfg.damping;
-        this.vy = (this.vy + forceY + spY) * cfg.damping;
+        this.vx = (this.vx + spX) * cfg.damping;
+        this.vy = (this.vy + spY) * cfg.damping;
         this.dx += this.vx;
         this.dy += this.vy;
       }
@@ -168,8 +168,8 @@ const ReedField = (() => {
         p.noStroke();
         p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
 
-        const sdx  = this.dx + this.wdx;
-        const sdy  = this.dy + this.wdy;
+        const sdx  = this.dx + this.wdx + this.mwx;
+        const sdy  = this.dy + this.wdy + this.mwy;
         const mag  = Math.sqrt(sdx * sdx + sdy * sdy);
         if (mag < 0.25) return;
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
@@ -219,16 +219,12 @@ const ReedField = (() => {
       seed:            42,
       reedCount:       1300,
       swayStrength:    2.5,
-      influenceRadiusCursor: 16,  // mouse/pen — matches system pointer glyph footprint
-      influenceRadiusTouch:  28,  // touch — thumb-pad contact estimate, retune by feel
-      forceStrength:   14,
       stiffness:       0.05,
       damping:         0.82,
-      reedLengthMin:   18,
-      reedLengthMax:   42,
+      reedLengthMin:   22,
+      reedLengthMax:   48,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
-      tipColor:        '#faa61a',
       aspectRatio:     null,   // null = fill container height
       autoMobileScale: true,
       waveSpeed:          6,    // px/frame wavefront expansion
@@ -238,6 +234,15 @@ const ReedField = (() => {
       waveStiffness:      0.9,  // spring stiffness for wave channel (stiffer = faster snap-back)
       waveDamping:        0.35, // damping for wave channel (lower = faster decay)
       waveTroughStrength: 0.7,  // inward trough amplitude as fraction of crest (enables interference)
+      moveGridCell:        14,   // heightfield cell size in px
+      moveGridDamping:     0.96, // grid propagation decay per frame (wave-equation channel)
+      moveEdgeSpongeWidth:   6,  // cells near each wall that get extra damping (absorbs before reflecting)
+      moveEdgeDamping:     0.87, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth) — loose enough to let a bounce through, still killed fast by moveGridDamping after
+      moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
+      moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
+      moveForceScale:      0.35, // grid gradient -> reed force conversion
+      moveStiffness:       0.55, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
+      moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
     // Auto-tune for small/touch screens (only if user didn't override)
@@ -248,7 +253,7 @@ const ReedField = (() => {
     new p5(p => {
       let reeds         = [];
       let bgBuffer      = null;
-      let baseCol, tipCol;
+      let baseCol;
       let baseR = 0, baseG = 0, baseB = 0;
       let canvasRect    = null;
       let pointerInside = false;
@@ -256,12 +261,54 @@ const ReedField = (() => {
       let lastMY        = -99999;
       let pathBuf       = [];       // cursor samples accumulated since last frame
       let prevTail      = null;     // last point from previous frame (joins polyline across frames)
-      let lastPointerType = 'mouse'; // 'mouse' | 'pen' | 'touch' — picks influenceRadiusCursor/Touch
+      let lastPointerType = 'mouse'; // 'mouse' | 'pen' | 'touch' — picks moveInjectStrength(Touch)
       const PATH_CAP    = 32;
       let Reed;
       let cnv;
       let waves         = [];       // active click waves
       let waveMaxRadiusEff = cfg.waveMaxRadius; // recomputed to canvas diagonal in initSystem()
+      // Movement-ripple heightfield: two padded buffers, wave-equation propagated.
+      // Independent of reed grid — sized off canvas px, not reedCount.
+      let gridCols = 0, gridRows = 0;
+      let hCurr = null, hPrev = null;
+      let spongeMask = null; // extra per-cell damping near edges — absorbs energy before it hits the hard wall
+      const gridIdx = (gx, gy) => (gy + 1) * (gridCols + 2) + (gx + 1);
+      function buildSponge() {
+        spongeMask = new Float32Array((gridCols + 2) * (gridRows + 2)).fill(1);
+        const w = cfg.moveEdgeSpongeWidth;
+        for (let gy = 0; gy < gridRows; gy++) {
+          for (let gx = 0; gx < gridCols; gx++) {
+            const distToEdge = Math.min(gx, gy, gridCols - 1 - gx, gridRows - 1 - gy);
+            spongeMask[gridIdx(gx, gy)] = distToEdge >= w
+              ? 1
+              : cfg.moveEdgeDamping + (1 - cfg.moveEdgeDamping) * (distToEdge / w);
+          }
+        }
+      }
+      function injectRipple(x, y, strength) {
+        const gxf = x / cfg.moveGridCell, gyf = y / cfg.moveGridCell;
+        const ix = Math.floor(gxf), iy = Math.floor(gyf);
+        const fx = gxf - ix, fy = gyf - iy;
+        addCell(ix,     iy,     strength * (1 - fx) * (1 - fy));
+        addCell(ix + 1, iy,     strength * fx       * (1 - fy));
+        addCell(ix,     iy + 1, strength * (1 - fx) * fy);
+        addCell(ix + 1, iy + 1, strength * fx       * fy);
+      }
+      function addCell(gx, gy, v) {
+        if (gx < 0 || gx >= gridCols || gy < 0 || gy >= gridRows) return;
+        hCurr[gridIdx(gx, gy)] += v;
+      }
+      function stepGrid() {
+        for (let gy = 0; gy < gridRows; gy++) {
+          for (let gx = 0; gx < gridCols; gx++) {
+            const i = gridIdx(gx, gy);
+            const neighbors = hCurr[gridIdx(gx - 1, gy)] + hCurr[gridIdx(gx + 1, gy)]
+                             + hCurr[gridIdx(gx, gy - 1)] + hCurr[gridIdx(gx, gy + 1)];
+            hPrev[i] = (neighbors * 0.5 - hPrev[i]) * cfg.moveGridDamping * spongeMask[i];
+          }
+        }
+        const tmp = hPrev; hPrev = hCurr; hCurr = tmp;
+      }
       const container   = document.getElementById(containerId);
 
       function canvasHeight() {
@@ -272,7 +319,6 @@ const ReedField = (() => {
 
       function parseColors() {
         baseCol = p.color(cfg.baseColor);
-        tipCol  = p.color(cfg.tipColor);
         baseR   = p.red(baseCol);
         baseG   = p.green(baseCol);
         baseB   = p.blue(baseCol);
@@ -291,6 +337,12 @@ const ReedField = (() => {
         waveMaxRadiusEff = userConfig.waveMaxRadius === undefined
           ? Math.hypot(p.width, p.height) + cfg.waveWidth
           : cfg.waveMaxRadius;
+        gridCols = Math.max(2, Math.ceil(p.width  / cfg.moveGridCell));
+        gridRows = Math.max(2, Math.ceil(p.height / cfg.moveGridCell));
+        const gridSize = (gridCols + 2) * (gridRows + 2);
+        hCurr = new Float32Array(gridSize);
+        hPrev = new Float32Array(gridSize);
+        buildSponge();
         reeds = [];
         const aspect = p.width / p.height;
         const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
@@ -428,21 +480,33 @@ const ReedField = (() => {
           if (waves[i].radius > waveMaxRadiusEff) waves.splice(i, 1);
         }
 
-        const infR = lastPointerType === 'touch' ? cfg.influenceRadiusTouch : cfg.influenceRadiusCursor;
+        // Movement injects into the shared heightfield (dip proportional to
+        // segment speed), then the grid propagates one wave-equation step.
+        // Stationary cursor = empty framePath = no injection, free.
+        if (framePath && framePath.length > 1) {
+          const strength = lastPointerType === 'touch'
+            ? cfg.moveInjectStrengthTouch
+            : cfg.moveInjectStrength;
+          for (let i = 1; i < framePath.length; i++) {
+            const [ax, ay] = framePath[i - 1];
+            const [bx, by] = framePath[i];
+            const segLen = Math.hypot(bx - ax, by - ay);
+            if (segLen < 0.01) continue;
+            injectRipple(bx, by, -Math.min(segLen, 40) * strength);
+          }
+        }
+        stepGrid();
+        const field = { hCurr, gridCols, gridRows, gridCell: cfg.moveGridCell, idx: gridIdx };
 
         p.image(bgBuffer, 0, 0);
 
         p.strokeWeight(Reed.BASE_W);
         for (const reed of reeds) {
-          reed.update(framePath, t, cfg, waves, infR);
+          reed.update(t, cfg, waves, field);
           reed.draw(baseR, baseG, baseB);
         }
 
         if (pointerInside && lastMX > 0 && lastMX < p.width && lastMY > 0 && lastMY < p.height) {
-          p.noFill();
-          p.stroke(255, 255, 255, 7);
-          p.strokeWeight(0.75);
-          p.ellipse(lastMX, lastMY, infR * 2, infR * 2);
           p.stroke(255, 255, 255, 35);
           p.strokeWeight(1.8);
           p.point(lastMX, lastMY);
