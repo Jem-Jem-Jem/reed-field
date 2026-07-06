@@ -217,7 +217,7 @@ const ReedField = (() => {
   function init(containerId, userConfig = {}) {
     const cfg = Object.assign({
       seed:            42,
-      reedCount:       1300,
+      reedGap:         null,   // desired spacing between reed bases, px. null = auto (reedLengthMax) — keeps neighbors far enough apart that one full-length displacement can't reach the next reed's base
       swayStrength:    2.5,
       stiffness:       0.05,
       damping:         0.82,
@@ -226,7 +226,6 @@ const ReedField = (() => {
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
       aspectRatio:     null,   // null = fill container height
-      autoMobileScale: true,
       waveSpeed:          6,    // px/frame wavefront expansion
       waveWidth:          8,    // crest half-wavelength in px
       waveStrength:       28,   // peak outward force at wavefront
@@ -245,10 +244,7 @@ const ReedField = (() => {
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
-    // Auto-tune for small/touch screens (only if user didn't override)
-    if (cfg.autoMobileScale && userConfig.reedCount === undefined && window.innerWidth < 768) {
-      cfg.reedCount = 600;
-    }
+    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLengthMax;
 
     new p5(p => {
       let reeds         = [];
@@ -348,9 +344,11 @@ const ReedField = (() => {
         hPrev = new Float32Array(gridSize);
         buildSponge();
         reeds = [];
-        const aspect = p.width / p.height;
-        const cols   = Math.max(Math.round(Math.sqrt(cfg.reedCount * aspect)), 1);
-        const rows   = Math.max(Math.round(cfg.reedCount / cols), 1);
+        // Density from a fixed px gap, not a fixed count — cols/rows adapt to
+        // any container size so a small frame gets fewer, still-spaced-out
+        // reeds instead of the same count crammed together.
+        const cols   = Math.max(1, Math.floor(p.width  / cfg.reedGap));
+        const rows   = Math.max(1, Math.floor(p.height / cfg.reedGap));
         const spX    = p.width  / cols;
         const spY    = p.height / rows;
         for (let r = 0; r < rows; r++) {

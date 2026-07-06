@@ -59,7 +59,7 @@ Visual knobs live in the `ReedField.init` call inside `index.html`:
 
 ```js
 ReedField.init('reed-hero', {
-  reedCount: 2000,
+  reedGap: 32,
   reedLengthMin: 8,
   reedLengthMax: 10,
   swayStrength: 0,
@@ -71,7 +71,7 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | Option            | Default     | What it does                                              |
 | ----------------- | ----------- | --------------------------------------------------------- |
 | `seed`            | `42`        | RNG seed — change for a different reed layout             |
-| `reedCount`       | `1300`      | How many reeds to place across the canvas                 |
+| `reedGap`         | `null`      | Desired px spacing between reed bases; null = auto (equals `reedLengthMax`, so one full-length displacement can't reach the next reed's base). Cols/rows are derived from this and the canvas size — same gap on any viewport, so a small frame just gets fewer reeds instead of a cramped, same-count grid |
 | `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
 | `stiffness`       | `0.02`      | Spring pull back to rest pose (lower = looser)            |
 | `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
@@ -96,7 +96,6 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
 | `baseColor`       | `#faa61a`   | Reed color (root and tip draw in the same color)           |
 | `aspectRatio`     | `null`      | If set, canvas height = width × ratio; otherwise fills    |
-| `autoMobileScale` | `true`      | Auto-drop reedCount on narrow viewports (only if unset)   |
 
 ## How the interaction works
 
