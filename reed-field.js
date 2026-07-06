@@ -27,14 +27,6 @@ const ReedField = (() => {
       constructor(x, y) {
         this.bx = x;
         this.by = y;
-        // Uniform rest pose: every reed sits at zero displacement
-        // (a dot at the base) and grows straight up when disturbed.
-        this.restDx = 0;
-        this.restDy = 0;
-        this.dx = 0;
-        this.dy = 0;
-        this.vx = 0;
-        this.vy = 0;
         // Separate channel for click-wave displacement (stiffer spring, higher damping).
         this.wdx = 0;
         this.wdy = 0;
@@ -45,7 +37,7 @@ const ReedField = (() => {
         this.mwy = 0;
         this.mvx = 0;
         this.mvy = 0;
-        this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
+        this.maxLen    = cfg.reedLength;
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
@@ -61,16 +53,10 @@ const ReedField = (() => {
         // between the displacement direction and straight up, so the tip
         // stays closer to vertical even when the reed is pushed hard.
         this.tipResist = rndRange(0.10, 0.25);
-        this.phase     = rnd() * Math.PI * 2;
-        this.phaseY    = rnd() * Math.PI * 2;
         this.colorVar  = rnd();
         this.alpha     = rndRange(140, 230);
       }
       update(t, cfg, waves, field) {
-        const sw    = cfg.swayStrength;
-        const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
-        const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
-
         // Wave channel — sinusoidal profile: outward crest + inward trough.
         // When two waves overlap, forces sum → constructive/destructive interference.
         let wfx = 0, wfy = 0;
@@ -151,16 +137,6 @@ const ReedField = (() => {
             && Math.abs(this.mvx) + Math.abs(this.mvy) < 0.02) {
           this.mwx = this.mwy = this.mvx = this.mvy = 0;
         }
-
-        // Sway channel — original settings unchanged.
-        const tDx = this.restDx + swayX;
-        const tDy = this.restDy + swayY;
-        const spX = (tDx - this.dx) * cfg.stiffness;
-        const spY = (tDy - this.dy) * cfg.stiffness;
-        this.vx = (this.vx + spX) * cfg.damping;
-        this.vy = (this.vy + spY) * cfg.damping;
-        this.dx += this.vx;
-        this.dy += this.vy;
       }
       draw(r, g, b) {
         // Base dot — always visible at rest.
@@ -168,8 +144,8 @@ const ReedField = (() => {
         p.noStroke();
         p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
 
-        const sdx  = this.dx + this.wdx + this.mwx;
-        const sdy  = this.dy + this.wdy + this.mwy;
+        const sdx  = this.wdx + this.mwx;
+        const sdy  = this.wdy + this.mwy;
         const mag  = Math.sqrt(sdx * sdx + sdy * sdy);
         if (mag < 0.25) return;
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
@@ -217,12 +193,9 @@ const ReedField = (() => {
   function init(containerId, userConfig = {}) {
     const cfg = Object.assign({
       seed:            42,
-      reedGap:         null,   // desired spacing between reed bases, px. null = auto (reedLengthMax) — keeps neighbors far enough apart that one full-length displacement can't reach the next reed's base
-      swayStrength:    2.5,
-      stiffness:       0.05,
-      damping:         0.82,
-      reedLengthMin:   22,
-      reedLengthMax:   48,
+      reedGap:         null,   // desired spacing between reed bases, px. null = auto, derived from reedGapRatio
+      reedGapRatio:    2.0,    // gap as a multiple of reedLength (1 = neighbor's base sits exactly at full reach, <1 = overlap possible, >1 = spaced apart). Only used when reedGap is null.
+      reedLength:      7,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
       aspectRatio:     null,   // null = fill container height
@@ -237,14 +210,14 @@ const ReedField = (() => {
       moveGridDamping:     0.96, // grid propagation decay per frame (wave-equation channel)
       moveEdgeSpongeWidth:   6,  // cells near each wall that get extra damping (absorbs before reflecting)
       moveEdgeDamping:     0.87, // damping multiplier at the very edge (ramps to 1.0 over spongeWidth) — loose enough to let a bounce through, still killed fast by moveGridDamping after
-      moveInjectStrength:  0.5,  // dip strength per px of mouse/pen movement
-      moveInjectStrengthTouch: 0.75, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
-      moveForceScale:      0.35, // grid gradient -> reed force conversion
-      moveStiffness:       0.35, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
+      moveInjectStrength:  1.4,  // dip strength per px of mouse/pen movement
+      moveInjectStrengthTouch: 2.0, // dip strength per px of touch movement (thumb-pad, stronger disturbance)
+      moveForceScale:      1.0,  // grid gradient -> reed force conversion
+      moveStiffness:       0.25, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
-    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLengthMax;
+    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLength * cfg.reedGapRatio;
 
     new p5(p => {
       let reeds         = [];

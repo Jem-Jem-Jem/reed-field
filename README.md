@@ -60,9 +60,7 @@ Visual knobs live in the `ReedField.init` call inside `index.html`:
 ```js
 ReedField.init('reed-hero', {
   reedGap: 32,
-  reedLengthMin: 8,
-  reedLengthMax: 10,
-  swayStrength: 0,
+  reedLength: 9,
 });
 ```
 
@@ -71,10 +69,8 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | Option            | Default     | What it does                                              |
 | ----------------- | ----------- | --------------------------------------------------------- |
 | `seed`            | `42`        | RNG seed — change for a different reed layout             |
-| `reedGap`         | `null`      | Desired px spacing between reed bases; null = auto (equals `reedLengthMax`, so one full-length displacement can't reach the next reed's base). Cols/rows are derived from this and the canvas size — same gap on any viewport, so a small frame just gets fewer reeds instead of a cramped, same-count grid |
-| `swayStrength`    | `2.5`       | Amount of idle, ambient motion                            |
-| `stiffness`       | `0.02`      | Spring pull back to rest pose (lower = looser)            |
-| `damping`         | `0.88`      | Velocity preserved per frame (lower = motion dies sooner) |
+| `reedGap`         | `null`      | Desired px spacing between reed bases; null = auto, derived from `reedGapRatio`. Cols/rows are derived from this and the canvas size — same gap on any viewport, so a small frame just gets fewer reeds instead of a cramped, same-count grid |
+| `reedGapRatio`    | `2.0`       | Gap as a multiple of `reedLength` (1 = neighbor's base sits exactly at full reach, <1 = overlap possible, >1 = spaced apart). Only used when `reedGap` is null |
 | `waveSpeed`       | `6`         | Click/tap wave expansion speed (px/frame)                 |
 | `waveWidth`       | `8`         | Click/tap wave crest half-wavelength (px)                 |
 | `waveStrength`    | `28`        | Click/tap wave peak outward force at the wavefront         |
@@ -91,8 +87,7 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `moveForceScale`  | `0.35`      | Grid gradient → reed push force conversion                |
 | `moveStiffness`   | `0.55`      | Spring stiffness of the movement-ripple reed channel (lower = slower pull back) |
 | `moveDamping`     | `0.5`       | Damping of the movement-ripple reed channel (higher = lingers longer) |
-| `reedLengthMin`   | `22`        | Minimum per-reed render length                            |
-| `reedLengthMax`   | `48`        | Maximum per-reed render length                            |
+| `reedLength`      | `7`         | Per-reed render length (fixed, no size variance)          |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
 | `baseColor`       | `#faa61a`   | Reed color (root and tip draw in the same color)           |
 | `aspectRatio`     | `null`      | If set, canvas height = width × ratio; otherwise fills    |
