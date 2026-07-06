@@ -87,7 +87,7 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | `moveForceScale`  | `0.35`      | Grid gradient → reed push force conversion                |
 | `moveStiffness`   | `0.55`      | Spring stiffness of the movement-ripple reed channel (lower = slower pull back) |
 | `moveDamping`     | `0.5`       | Damping of the movement-ripple reed channel (higher = lingers longer) |
-| `reedLength`      | `50`        | Per-reed render length (fixed, no size variance)          |
+| `reedLength`      | `25`        | Per-reed render length (fixed, no size variance)          |
 | `bgColor`         | `#1c2252`   | Canvas background                                         |
 | `baseColor`       | `#faa61a`   | Reed color (root and tip draw in the same color)           |
 | `aspectRatio`     | `null`      | If set, canvas height = width × ratio; otherwise fills    |
