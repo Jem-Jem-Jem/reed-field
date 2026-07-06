@@ -70,7 +70,7 @@ Everything else falls back to the defaults defined in `reed-field.js`. The full 
 | ----------------- | ----------- | --------------------------------------------------------- |
 | `seed`            | `42`        | RNG seed — change for a different reed layout             |
 | `reedGap`         | `null`      | Desired px spacing between reed bases; null = auto, derived from `reedOverlap`. Cols/rows are derived from this and the canvas size — same gap on any viewport, so a small frame just gets fewer reeds instead of a cramped, same-count grid |
-| `reedOverlap`     | `0`         | Fraction of `reedLength` a fully-extended reed may reach past a neighbor's base (0 = no overlap, 1 = tip can reach the neighbor's own tip). Only used when `reedGap` is null |
+| `reedOverlap`     | `-0.2`      | Fraction of `reedLength` a fully-extended reed may reach past a neighbor's base (0 = no overlap, 1 = tip can reach the neighbor's own tip, negative = extra spacing beyond full reach). Only used when `reedGap` is null |
 | `waveSpeed`       | `6`         | Click/tap wave expansion speed (px/frame)                 |
 | `waveWidth`       | `8`         | Click/tap wave crest half-wavelength (px)                 |
 | `waveStrength`    | `28`        | Click/tap wave peak outward force at the wavefront         |
