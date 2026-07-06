@@ -193,7 +193,8 @@ const ReedField = (() => {
   function init(containerId, userConfig = {}) {
     const cfg = Object.assign({
       seed:            42,
-      reedGap:         null,   // desired spacing between reed bases, px. null = auto (0.5x reedLength) — denser than a strict no-touch gap, occasional overlap on max displacement toward each other
+      reedGap:         null,   // desired spacing between reed bases, px. null = auto, derived from reedOverlap
+      reedOverlap:     0.5,    // fraction of reedLength a fully-extended reed may reach past a neighbor's base (0 = no overlap possible, 1 = tip can reach the neighbor's own tip). Only used when reedGap is null.
       reedLength:      50,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
@@ -216,7 +217,7 @@ const ReedField = (() => {
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
-    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLength * 0.5;
+    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLength * (1 - cfg.reedOverlap);
 
     new p5(p => {
       let reeds         = [];
