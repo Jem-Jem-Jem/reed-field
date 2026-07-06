@@ -195,7 +195,7 @@ const ReedField = (() => {
       seed:            42,
       reedGap:         null,   // desired spacing between reed bases, px. null = auto, derived from reedGapRatio
       reedGapRatio:    1.5,    // gap as a multiple of reedLength (1 = neighbor's base sits exactly at full reach, <1 = overlap possible, >1 = spaced apart). Only used when reedGap is null.
-      reedLength:      10,
+      reedLength:      7,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
       aspectRatio:     null,   // null = fill container height
