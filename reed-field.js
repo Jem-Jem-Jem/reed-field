@@ -27,14 +27,6 @@ const ReedField = (() => {
       constructor(x, y) {
         this.bx = x;
         this.by = y;
-        // Uniform rest pose: every reed sits at zero displacement
-        // (a dot at the base) and grows straight up when disturbed.
-        this.restDx = 0;
-        this.restDy = 0;
-        this.dx = 0;
-        this.dy = 0;
-        this.vx = 0;
-        this.vy = 0;
         // Separate channel for click-wave displacement (stiffer spring, higher damping).
         this.wdx = 0;
         this.wdy = 0;
@@ -61,16 +53,10 @@ const ReedField = (() => {
         // between the displacement direction and straight up, so the tip
         // stays closer to vertical even when the reed is pushed hard.
         this.tipResist = rndRange(0.10, 0.25);
-        this.phase     = rnd() * Math.PI * 2;
-        this.phaseY    = rnd() * Math.PI * 2;
         this.colorVar  = rnd();
         this.alpha     = rndRange(140, 230);
       }
       update(t, cfg, waves, field) {
-        const sw    = cfg.swayStrength;
-        const swayX = Math.sin(t * 0.52 + this.phase)  * sw;
-        const swayY = Math.cos(t * 0.41 + this.phaseY) * sw * 0.62;
-
         // Wave channel — sinusoidal profile: outward crest + inward trough.
         // When two waves overlap, forces sum → constructive/destructive interference.
         let wfx = 0, wfy = 0;
@@ -151,16 +137,6 @@ const ReedField = (() => {
             && Math.abs(this.mvx) + Math.abs(this.mvy) < 0.02) {
           this.mwx = this.mwy = this.mvx = this.mvy = 0;
         }
-
-        // Sway channel — original settings unchanged.
-        const tDx = this.restDx + swayX;
-        const tDy = this.restDy + swayY;
-        const spX = (tDx - this.dx) * cfg.stiffness;
-        const spY = (tDy - this.dy) * cfg.stiffness;
-        this.vx = (this.vx + spX) * cfg.damping;
-        this.vy = (this.vy + spY) * cfg.damping;
-        this.dx += this.vx;
-        this.dy += this.vy;
       }
       draw(r, g, b) {
         // Base dot — always visible at rest.
@@ -168,8 +144,8 @@ const ReedField = (() => {
         p.noStroke();
         p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
 
-        const sdx  = this.dx + this.wdx + this.mwx;
-        const sdy  = this.dy + this.wdy + this.mwy;
+        const sdx  = this.wdx + this.mwx;
+        const sdy  = this.wdy + this.mwy;
         const mag  = Math.sqrt(sdx * sdx + sdy * sdy);
         if (mag < 0.25) return;
         const vLen = Math.min(mag * 2.4 + 3.0, this.maxLen);
@@ -218,9 +194,6 @@ const ReedField = (() => {
     const cfg = Object.assign({
       seed:            42,
       reedGap:         null,   // desired spacing between reed bases, px. null = auto (0.5x reedLength) — denser than a strict no-touch gap, occasional overlap on max displacement toward each other
-      swayStrength:    2.5,
-      stiffness:       0.05,
-      damping:         0.82,
       reedLength:      50,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
