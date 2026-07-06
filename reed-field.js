@@ -45,7 +45,7 @@ const ReedField = (() => {
         this.mwy = 0;
         this.mvx = 0;
         this.mvy = 0;
-        this.maxLen    = rndRange(cfg.reedLengthMin, cfg.reedLengthMax);
+        this.maxLen    = cfg.reedLength;
         // Cubic Bezier bend personality (curvature near the base, near-straight
         // mid-to-tip section that points along the displacement direction):
         //   bendBaseLen = length of the straight-up tangent at the base
@@ -217,12 +217,11 @@ const ReedField = (() => {
   function init(containerId, userConfig = {}) {
     const cfg = Object.assign({
       seed:            42,
-      reedGap:         null,   // desired spacing between reed bases, px. null = auto (reedLengthMax) — keeps neighbors far enough apart that one full-length displacement can't reach the next reed's base
+      reedGap:         null,   // desired spacing between reed bases, px. null = auto (0.5x reedLength) — denser than a strict no-touch gap, occasional overlap on max displacement toward each other
       swayStrength:    2.5,
       stiffness:       0.05,
       damping:         0.82,
-      reedLengthMin:   22,
-      reedLengthMax:   48,
+      reedLength:      50,
       bgColor:         '#1c2252',
       baseColor:       '#faa61a',
       aspectRatio:     null,   // null = fill container height
@@ -244,7 +243,7 @@ const ReedField = (() => {
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
     }, userConfig);
 
-    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLengthMax;
+    if (cfg.reedGap == null) cfg.reedGap = cfg.reedLength * 0.5;
 
     new p5(p => {
       let reeds         = [];
