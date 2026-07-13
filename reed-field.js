@@ -22,10 +22,11 @@ const ReedField = (() => {
 
   // Interaction force scales down on small canvases so a tap/drag tuned
   // against a desktop-size field doesn't overwhelm a mobile-size one.
-  // 1280px+ = full strength (today's exact behavior); floors at 0.5 so
-  // interaction stays clearly present even on the smallest phones.
+  // 1280px+ = full strength (today's exact behavior); floors at 0.35 so
+  // interaction stays present but noticeably calmer on the smallest phones
+  // (0.5 still felt too intense on-device — lowered post-#50).
   const SCALE_REF_WIDTH = 1280;
-  const SCALE_FLOOR      = 0.5;
+  const SCALE_FLOOR      = 0.35;
   const computeInteractionScale = canvasWidth =>
     Math.max(SCALE_FLOOR, Math.min(1, canvasWidth / SCALE_REF_WIDTH));
 
