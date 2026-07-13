@@ -245,6 +245,7 @@ const ReedField = (() => {
       let cnv;
       let waves         = [];       // active click waves
       let waveMaxRadiusEff = cfg.waveMaxRadius; // recomputed to canvas diagonal in initSystem()
+      let effCfg          = cfg; // rebuilt in initSystem() with scaled force/grid fields
       // Movement-ripple heightfield: two padded buffers, wave-equation propagated.
       // Independent of reed grid — sized off canvas px, not reedCount.
       let gridCols = 0, gridRows = 0;
@@ -273,7 +274,7 @@ const ReedField = (() => {
         [-1,  1, 0.05], [0,  1, 0.1], [1,  1, 0.05],
       ];
       function injectRipple(x, y, strength) {
-        const ix = Math.round(x / cfg.moveGridCell), iy = Math.round(y / cfg.moveGridCell);
+        const ix = Math.round(x / effCfg.moveGridCell), iy = Math.round(y / effCfg.moveGridCell);
         for (const [dx, dy, w] of INJECT_KERNEL) addCell(ix + dx, iy + dy, strength * w);
       }
       function addCell(gx, gy, v) {
@@ -308,6 +309,15 @@ const ReedField = (() => {
 
       function initSystem() {
         waves.length = 0;
+        const scale = computeInteractionScale(p.width);
+        effCfg = {
+          ...cfg,
+          waveStrength:            cfg.waveStrength * scale,
+          moveInjectStrength:      cfg.moveInjectStrength * scale,
+          moveInjectStrengthTouch: cfg.moveInjectStrengthTouch * scale,
+          moveForceScale:          cfg.moveForceScale * scale,
+          moveGridCell:            cfg.moveGridCell * scale,
+        };
         seedRNG(cfg.seed);
         Reed     = makeReedClass(p, cfg);
         bgBuffer = buildBackground(p, cfg);
@@ -319,8 +329,8 @@ const ReedField = (() => {
         waveMaxRadiusEff = userConfig.waveMaxRadius === undefined
           ? Math.hypot(p.width, p.height) + cfg.waveWidth
           : cfg.waveMaxRadius;
-        gridCols = Math.max(2, Math.ceil(p.width  / cfg.moveGridCell));
-        gridRows = Math.max(2, Math.ceil(p.height / cfg.moveGridCell));
+        gridCols = Math.max(2, Math.ceil(p.width  / effCfg.moveGridCell));
+        gridRows = Math.max(2, Math.ceil(p.height / effCfg.moveGridCell));
         const gridSize = (gridCols + 2) * (gridRows + 2);
         hCurr = new Float32Array(gridSize);
         hPrev = new Float32Array(gridSize);
@@ -372,7 +382,7 @@ const ReedField = (() => {
       }
 
       function spawnWave(clientX, clientY) {
-        waves.push({ cx: clientX - canvasRect.left, cy: clientY - canvasRect.top, radius: 0, strength: cfg.waveStrength });
+        waves.push({ cx: clientX - canvasRect.left, cy: clientY - canvasRect.top, radius: 0, strength: effCfg.waveStrength });
       }
 
       p.setup = () => {
@@ -477,8 +487,8 @@ const ReedField = (() => {
         // Stationary cursor = empty framePath = no injection, free.
         if (framePath && framePath.length > 1) {
           const strength = lastPointerType === 'touch'
-            ? cfg.moveInjectStrengthTouch
-            : cfg.moveInjectStrength;
+            ? effCfg.moveInjectStrengthTouch
+            : effCfg.moveInjectStrength;
           for (let i = 1; i < framePath.length; i++) {
             const [ax, ay] = framePath[i - 1];
             const [bx, by] = framePath[i];
@@ -488,13 +498,13 @@ const ReedField = (() => {
           }
         }
         stepGrid();
-        const field = { hCurr, gridCols, gridRows, gridCell: cfg.moveGridCell, idx: gridIdx };
+        const field = { hCurr, gridCols, gridRows, gridCell: effCfg.moveGridCell, idx: gridIdx };
 
         p.image(bgBuffer, 0, 0);
 
         p.strokeWeight(Reed.BASE_W);
         for (const reed of reeds) {
-          reed.update(t, cfg, waves, field);
+          reed.update(t, effCfg, waves, field);
           reed.draw(baseR, baseG, baseB);
         }
 
