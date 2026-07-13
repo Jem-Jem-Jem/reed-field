@@ -310,13 +310,21 @@ const ReedField = (() => {
       function initSystem() {
         waves.length = 0;
         const scale = computeInteractionScale(p.width);
+        // Movement-ripple force passes through two multipliers (inject strength,
+        // then gradient->force conversion) before it reaches a reed, vs click-wave's
+        // one (waveStrength). Splitting `scale` across both as its square root makes
+        // their product equal `scale` — same overall attenuation curve as click-wave,
+        // instead of compounding to scale^2 (e.g. 0.39x instead of 0.625x at 800px).
+        // moveGridCell is intentionally left unscaled: shrinking it also changes the
+        // spacing of Reed.update()'s finite-difference gradient sample, a third,
+        // hard-to-predict attenuation source on top of the two above.
+        const forceScale = Math.sqrt(scale);
         effCfg = {
           ...cfg,
           waveStrength:            cfg.waveStrength * scale,
-          moveInjectStrength:      cfg.moveInjectStrength * scale,
-          moveInjectStrengthTouch: cfg.moveInjectStrengthTouch * scale,
-          moveForceScale:          cfg.moveForceScale * scale,
-          moveGridCell:            cfg.moveGridCell * scale,
+          moveInjectStrength:      cfg.moveInjectStrength * forceScale,
+          moveInjectStrengthTouch: cfg.moveInjectStrengthTouch * forceScale,
+          moveForceScale:          cfg.moveForceScale * forceScale,
         };
         seedRNG(cfg.seed);
         Reed     = makeReedClass(p, cfg);
