@@ -20,6 +20,15 @@ const ReedField = (() => {
   };
   const rndRange = (lo, hi) => lo + rnd() * (hi - lo);
 
+  // Interaction force scales down on small canvases so a tap/drag tuned
+  // against a desktop-size field doesn't overwhelm a mobile-size one.
+  // 1280px+ = full strength (today's exact behavior); floors at 0.5 so
+  // interaction stays clearly present even on the smallest phones.
+  const SCALE_REF_WIDTH = 1280;
+  const SCALE_FLOOR      = 0.5;
+  const computeInteractionScale = canvasWidth =>
+    Math.max(SCALE_FLOOR, Math.min(1, canvasWidth / SCALE_REF_WIDTH));
+
   function makeReedClass(p, cfg) {
     class Reed {
       static DOT_DIAM = 3;
@@ -504,5 +513,9 @@ const ReedField = (() => {
     });
   }
 
-  return { init };
+  return { init, computeInteractionScale };
 })();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ReedField };
+}
