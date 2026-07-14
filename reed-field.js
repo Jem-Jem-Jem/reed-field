@@ -252,6 +252,10 @@ const ReedField = (() => {
       let gridCols = 0, gridRows = 0;
       let hCurr = null, hPrev = null;
       let spongeMask = null; // extra per-cell damping near edges — absorbs energy before it hits the hard wall
+      // ponytail: grid decays asymptotically under moveGridDamping but never hits
+      // exact 0 — sleep once every cell is below the visually-imperceptible
+      // threshold (mirrors physics-engine "sleeping bodies"), wake on next inject.
+      let gridActive = false;
       const gridIdx = (gx, gy) => (gy + 1) * (gridCols + 2) + (gx + 1);
       function buildSponge() {
         spongeMask = new Float32Array((gridCols + 2) * (gridRows + 2)).fill(1);
@@ -283,15 +287,22 @@ const ReedField = (() => {
         hCurr[gridIdx(gx, gy)] += v;
       }
       function stepGrid() {
+        let maxAbs = 0;
         for (let gy = 0; gy < gridRows; gy++) {
           for (let gx = 0; gx < gridCols; gx++) {
             const i = gridIdx(gx, gy);
             const neighbors = hCurr[gridIdx(gx - 1, gy)] + hCurr[gridIdx(gx + 1, gy)]
                              + hCurr[gridIdx(gx, gy - 1)] + hCurr[gridIdx(gx, gy + 1)];
-            hPrev[i] = (neighbors * 0.5 - hPrev[i]) * cfg.moveGridDamping * spongeMask[i];
+            const v = (neighbors * 0.5 - hPrev[i]) * cfg.moveGridDamping * spongeMask[i];
+            hPrev[i] = v;
+            const av = v < 0 ? -v : v;
+            if (av > maxAbs) maxAbs = av;
           }
         }
         const tmp = hPrev; hPrev = hCurr; hCurr = tmp;
+        // Below this, cells contribute no visible displacement — safe to stop
+        // stepping until the next injection wakes the grid back up.
+        gridActive = maxAbs > 1e-3;
       }
       const container   = document.getElementById(containerId);
 
@@ -343,6 +354,7 @@ const ReedField = (() => {
         const gridSize = (gridCols + 2) * (gridRows + 2);
         hCurr = new Float32Array(gridSize);
         hPrev = new Float32Array(gridSize);
+        gridActive = false;
         buildSponge();
         reeds = [];
         // Density from a fixed px gap, not a fixed count — cols/rows adapt to
@@ -504,10 +516,14 @@ const ReedField = (() => {
             const segLen = Math.hypot(bx - ax, by - ay);
             if (segLen < 0.01) continue;
             injectRipple(bx, by, -Math.min(segLen, 40) * strength);
+            gridActive = true;
           }
         }
-        stepGrid();
-        const field = { hCurr, gridCols, gridRows, gridCell: effCfg.moveGridCell, idx: gridIdx };
+        // Skip the whole grid relaxation pass once it's settled below the
+        // visible threshold — same idea as physics-engine "sleeping bodies".
+        // Field stays null until the next injection wakes it back up.
+        if (gridActive) stepGrid();
+        const field = gridActive ? { hCurr, gridCols, gridRows, gridCell: effCfg.moveGridCell, idx: gridIdx } : null;
 
         p.image(bgBuffer, 0, 0);
 
