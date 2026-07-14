@@ -418,52 +418,30 @@ const ReedField = (() => {
         cnv.elt.style.cursor     = 'crosshair';
         cnv.elt.style.touchAction = 'none';
 
-        // Pointer events cover mouse, pen and touch in one place.
-        if (window.PointerEvent) {
-          // Cursor tracking is primary-pointer only and path samples only on move,
-          // so secondary touches don't inject line segments between touch points.
-          cnv.elt.addEventListener('pointerenter',  e => { if (e.isPrimary) handlePointerEvent(e); });
-          cnv.elt.addEventListener('pointermove',   e => { if (e.isPrimary) handlePointerEvent(e); });
-          cnv.elt.addEventListener('pointerdown',   e => {
-            if (e.isPrimary) {
-              lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
-              // Set cursor position on initial contact without adding a path sample.
-              lastMX = e.clientX - canvasRect.left;
-              lastMY = e.clientY - canvasRect.top;
-              pointerInside = true;
-            }
-            // Touch spawns its wave on release, not contact, so a tap doesn't
-            // stomp the movement-ripple wake before the finger even moves.
-            if (e.pointerType !== 'touch') spawnWave(e.clientX, e.clientY);
-          });
-          cnv.elt.addEventListener('pointerup',     e => {
-            if (e.pointerType === 'touch') spawnWave(e.clientX, e.clientY);
-            if (e.isPrimary) resetPointer();
-          });
-          cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
-          cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
-        } else {
-          // Fallback for older browsers.
-          cnv.elt.addEventListener('mouseenter', e => { lastPointerType = 'mouse'; updateFromClient(e.clientX, e.clientY); });
-          cnv.elt.addEventListener('mousemove',  e => { lastPointerType = 'mouse'; updateFromClient(e.clientX, e.clientY); });
-          cnv.elt.addEventListener('mouseleave', resetPointer);
-          cnv.elt.addEventListener('mousedown',  e => spawnWave(e.clientX, e.clientY));
-          cnv.elt.addEventListener('touchstart', e => {
-            lastPointerType = 'touch';
-            const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
-            e.preventDefault();
-          }, { passive: false });
-          cnv.elt.addEventListener('touchmove', e => {
-            lastPointerType = 'touch';
-            const t = e.touches[0]; if (t) updateFromClient(t.clientX, t.clientY);
-            e.preventDefault();
-          }, { passive: false });
-          cnv.elt.addEventListener('touchend', e => {
-            // Touch spawns its wave on release, not contact — see pointerdown/up above.
-            for (const touch of e.changedTouches) spawnWave(touch.clientX, touch.clientY);
-            resetPointer();
-          });
-        }
+        // Pointer events cover mouse, pen and touch in one place (Baseline
+        // since 2020 — no fallback needed for any browser this project targets).
+        // Cursor tracking is primary-pointer only and path samples only on move,
+        // so secondary touches don't inject line segments between touch points.
+        cnv.elt.addEventListener('pointerenter',  e => { if (e.isPrimary) handlePointerEvent(e); });
+        cnv.elt.addEventListener('pointermove',   e => { if (e.isPrimary) handlePointerEvent(e); });
+        cnv.elt.addEventListener('pointerdown',   e => {
+          if (e.isPrimary) {
+            lastPointerType = e.pointerType === 'touch' ? 'touch' : 'mouse';
+            // Set cursor position on initial contact without adding a path sample.
+            lastMX = e.clientX - canvasRect.left;
+            lastMY = e.clientY - canvasRect.top;
+            pointerInside = true;
+          }
+          // Touch spawns its wave on release, not contact, so a tap doesn't
+          // stomp the movement-ripple wake before the finger even moves.
+          if (e.pointerType !== 'touch') spawnWave(e.clientX, e.clientY);
+        });
+        cnv.elt.addEventListener('pointerup',     e => {
+          if (e.pointerType === 'touch') spawnWave(e.clientX, e.clientY);
+          if (e.isPrimary) resetPointer();
+        });
+        cnv.elt.addEventListener('pointerleave',  e => { if (e.isPrimary) resetPointer(); });
+        cnv.elt.addEventListener('pointercancel', e => { if (e.isPrimary) resetPointer(); });
 
         initSystem();
       };
