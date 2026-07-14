@@ -225,6 +225,7 @@ const ReedField = (() => {
       moveForceScale:      1.0,  // grid gradient -> reed force conversion
       moveStiffness:       0.25, // spring stiffness for movement-ripple reed channel (lower = slower pull back to rest)
       moveDamping:         0.5,  // damping for movement-ripple reed channel (higher = velocity lingers longer)
+      moveSegCap:          40,   // max px/frame of swipe distance that counts toward injection strength (saturation ceiling)
     }, userConfig);
 
     if (cfg.reedGap == null) cfg.reedGap = cfg.reedLength * cfg.reedGapRatio;
@@ -334,9 +335,14 @@ const ReedField = (() => {
         effCfg = {
           ...cfg,
           waveStrength:            cfg.waveStrength * scale,
+          waveWidth:               cfg.waveWidth * scale,
           moveInjectStrength:      cfg.moveInjectStrength * forceScale,
           moveInjectStrengthTouch: cfg.moveInjectStrengthTouch * forceScale,
           moveForceScale:          cfg.moveForceScale * forceScale,
+          // Linear scale (not forceScale) — this caps how much raw swipe distance
+          // saturates into injection strength, a canvas-relative reach ceiling,
+          // not a second force-amplitude multiplier stacking with the two above.
+          moveSegCap:              cfg.moveSegCap * scale,
         };
         seedRNG(cfg.seed);
         Reed     = makeReedClass(p, cfg);
@@ -493,7 +499,7 @@ const ReedField = (() => {
             const [bx, by] = framePath[i];
             const segLen = Math.hypot(bx - ax, by - ay);
             if (segLen < 0.01) continue;
-            injectRipple(bx, by, -Math.min(segLen, 40) * strength);
+            injectRipple(bx, by, -Math.min(segLen, effCfg.moveSegCap) * strength);
             gridActive = true;
           }
         }
