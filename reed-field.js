@@ -148,12 +148,11 @@ const ReedField = (() => {
           this.mwx = this.mwy = this.mvx = this.mvy = 0;
         }
       }
+      // Base dots are static, so they're baked into the background buffer once
+      // (see initSystem) instead of redrawn every frame — this is the actual
+      // per-frame cost at scale (one p.ellipse per reed × thousands). draw() now
+      // only strokes the bend for reeds that are actually displaced.
       draw(r, g, b) {
-        // Base dot — always visible at rest.
-        p.fill(r, g, b, this.alpha);
-        p.noStroke();
-        p.ellipse(this.bx, this.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
-
         const sdx  = this.wdx + this.mwx;
         const sdy  = this.wdy + this.mwy;
         const mag  = Math.sqrt(sdx * sdx + sdy * sdy);
@@ -257,6 +256,16 @@ const ReedField = (() => {
       // exact 0 — sleep once every cell is below the visually-imperceptible
       // threshold (mirrors physics-engine "sleeping bodies"), wake on next inject.
       let gridActive = false;
+      // Bounding box of non-zero grid cells (inclusive). Empty when min > max.
+      // Lets stepGrid() and the reed gate touch only the disturbed region
+      // instead of the whole O(area) field.
+      let gDMinX = 1, gDMaxX = 0, gDMinY = 1, gDMaxY = 0;
+      const markCell = (gx, gy) => {
+        if (gx < gDMinX) gDMinX = gx;
+        if (gx > gDMaxX) gDMaxX = gx;
+        if (gy < gDMinY) gDMinY = gy;
+        if (gy > gDMaxY) gDMaxY = gy;
+      };
       const gridIdx = (gx, gy) => (gy + 1) * (gridCols + 2) + (gx + 1);
       function buildSponge() {
         spongeMask = new Float32Array((gridCols + 2) * (gridRows + 2)).fill(1);
@@ -286,11 +295,19 @@ const ReedField = (() => {
       function addCell(gx, gy, v) {
         if (gx < 0 || gx >= gridCols || gy < 0 || gy >= gridRows) return;
         hCurr[gridIdx(gx, gy)] += v;
+        markCell(gx, gy);
       }
       function stepGrid() {
+        if (gDMinX > gDMaxX) { gridActive = false; return; } // empty — nothing to relax
+        // The wave-equation front advances exactly one cell per frame, so relaxing
+        // one ring beyond the current non-zero box captures it. Cells outside stay
+        // zero in both buffers and are safe to skip — same result as the full sweep.
+        const x0 = Math.max(0, gDMinX - 1), x1 = Math.min(gridCols - 1, gDMaxX + 1);
+        const y0 = Math.max(0, gDMinY - 1), y1 = Math.min(gridRows - 1, gDMaxY + 1);
         let maxAbs = 0;
-        for (let gy = 0; gy < gridRows; gy++) {
-          for (let gx = 0; gx < gridCols; gx++) {
+        let nMinX = 1, nMaxX = 0, nMinY = 1, nMaxY = 0; // recomputed non-zero box (empty)
+        for (let gy = y0; gy <= y1; gy++) {
+          for (let gx = x0; gx <= x1; gx++) {
             const i = gridIdx(gx, gy);
             const neighbors = hCurr[gridIdx(gx - 1, gy)] + hCurr[gridIdx(gx + 1, gy)]
                              + hCurr[gridIdx(gx, gy - 1)] + hCurr[gridIdx(gx, gy + 1)];
@@ -298,9 +315,16 @@ const ReedField = (() => {
             hPrev[i] = v;
             const av = v < 0 ? -v : v;
             if (av > maxAbs) maxAbs = av;
+            if (av > 1e-3) {
+              if (gx < nMinX) nMinX = gx;
+              if (gx > nMaxX) nMaxX = gx;
+              if (gy < nMinY) nMinY = gy;
+              if (gy > nMaxY) nMaxY = gy;
+            }
           }
         }
         const tmp = hPrev; hPrev = hCurr; hCurr = tmp;
+        gDMinX = nMinX; gDMaxX = nMaxX; gDMinY = nMinY; gDMaxY = nMaxY;
         // Below this, cells contribute no visible displacement — safe to stop
         // stepping until the next injection wakes the grid back up.
         gridActive = maxAbs > 1e-3;
@@ -361,6 +385,7 @@ const ReedField = (() => {
         hCurr = new Float32Array(gridSize);
         hPrev = new Float32Array(gridSize);
         gridActive = false;
+        gDMinX = 1; gDMaxX = 0; gDMinY = 1; gDMaxY = 0; // empty dirty box
         buildSponge();
         reeds = [];
         // Density from a fixed px gap, not a fixed count — cols/rows adapt to
@@ -370,12 +395,25 @@ const ReedField = (() => {
         const rows   = Math.max(1, Math.floor(p.height / cfg.reedGap));
         const spX    = p.width  / cols;
         const spY    = p.height / rows;
+        const gc     = effCfg.moveGridCell; // constant per layout — reed cell is fixed
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             const x = p.constrain((c + 0.5) * spX, 1, p.width  - 1);
             const y = p.constrain((r + 0.5) * spY, 1, p.height - 1);
-            reeds.push(new Reed(x, y));
+            const reed = new Reed(x, y);
+            // Precomputed grid cell — lets the per-frame gate test "is this reed
+            // inside the ripple's dirty box" without any per-frame division.
+            reed.gx0 = Math.max(0, Math.min(gridCols - 1, Math.round(x / gc)));
+            reed.gy0 = Math.max(0, Math.min(gridRows - 1, Math.round(y / gc)));
+            reeds.push(reed);
           }
+        }
+        // Bake the static base dots into the background once — they never move,
+        // so redrawing thousands of them every frame was the real per-frame cost.
+        bgBuffer.noStroke();
+        for (const reed of reeds) {
+          bgBuffer.fill(baseR, baseG, baseB, reed.alpha);
+          bgBuffer.ellipse(reed.bx, reed.by, Reed.DOT_DIAM, Reed.DOT_DIAM);
         }
       }
 
@@ -470,6 +508,31 @@ const ReedField = (() => {
         new ResizeObserver(refreshSize).observe(container);
       }
 
+      // A reed needs its physics run this frame only if it is still moving, or a
+      // disturbance currently overlaps it. Everything else would compute all-zeros
+      // and dead-zone anyway — so skip it. This is what makes per-frame work scale
+      // with the disturbance instead of the whole (O(area)) field.
+      // ponytail: wave test is O(reeds × waves) but sqrt-free cheap compares
+      // (~tens of k/frame); switch to annulus-cell iteration only if tap-spam
+      // ever makes many concurrent waves the bottleneck.
+      function reedAffected(reed, waveBands) {
+        // Still settling (position or velocity non-zero on either channel).
+        if (reed.wdx || reed.wdy || reed.wvx || reed.wvy
+            || reed.mwx || reed.mwy || reed.mvx || reed.mvy) return true;
+        // Movement-ripple region — ±1 covers the gradient's neighbor reads.
+        if (gridActive
+            && reed.gx0 >= gDMinX - 1 && reed.gx0 <= gDMaxX + 1
+            && reed.gy0 >= gDMinY - 1 && reed.gy0 <= gDMaxY + 1) return true;
+        // Inside any click-wave annulus (squared distance — same band as update()).
+        for (let i = 0; i < waveBands.length; i++) {
+          const b = waveBands[i];
+          const dx = reed.bx - b.cx, dy = reed.by - b.cy;
+          const dd = dx * dx + dy * dy;
+          if (dd <= b.outer2 && dd >= b.inner2) return true;
+        }
+        return false;
+      }
+
       p.draw = () => {
         const t = p.frameCount * 0.016;
 
@@ -511,8 +574,23 @@ const ReedField = (() => {
 
         p.image(bgBuffer, 0, 0);
 
+        // Cheap squared-distance annulus bounds per active wave, computed once so the
+        // gate can reject far reeds without a sqrt or a method call.
+        const half      = effCfg.waveWidth * 0.5;
+        const troughLen = effCfg.waveWidth * 2;
+        const waveBands = [];
+        for (const w of waves) {
+          const outer = w.radius + half;
+          const inner = Math.max(0, w.radius - effCfg.waveSpeed - half - troughLen);
+          waveBands.push({ cx: w.cx, cy: w.cy, inner2: inner * inner, outer2: outer * outer });
+        }
+
+        // Only reeds touched by a disturbance need any per-frame work now: their
+        // physics, and their bezier stroke. Everything else is already painted by
+        // the baked background. Per-frame cost scales with the disturbance, not the field.
         p.strokeWeight(Reed.BASE_W);
         for (const reed of reeds) {
+          if (!reedAffected(reed, waveBands)) continue;
           reed.update(t, effCfg, waves, field);
           reed.draw(baseR, baseG, baseB);
         }
